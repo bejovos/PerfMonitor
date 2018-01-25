@@ -10,38 +10,24 @@
 #include <cassert>
 #include <iostream>
 #include <iomanip>
+#include <algorithm>
 
 // Records
 namespace PerfMonitor
   {
   struct TimeRecord
     {
-    __int64 counter;
-
-    template <class T>
-    explicit TimeRecord(T&& i_counter)
-      : counter(static_cast<__int64>(i_counter))
-      {}
+    std::uint64_t counter;
     };
 
   struct MemoryRecord
     {
-    __int64 counter;
-
-    template <class T>
-    explicit MemoryRecord(T&& i_counter)
-      : counter(static_cast<__int64>(i_counter))
-      {}
+    std::uint64_t counter;
     };
 
   struct NumericRecord
     {
-    __int64 counter;
-
-    template <class T>
-    explicit NumericRecord(T&& i_counter)
-      : counter(static_cast<__int64>(i_counter))
-      {}
+    std::int64_t counter;
     };
 
   template <class Stream>
@@ -79,11 +65,6 @@ namespace PerfMonitor
     auto precision = stream.precision();
     auto flags = stream.flags();
     stream << std::fixed;
-    if (memory < 0)
-      {
-      memory = -memory;
-      stream << "-";
-      }
     SetColor(Color::Yellow);
     if (memory < 1000)
       stream << std::setprecision(0) << round(memory) << " b";
@@ -164,13 +145,13 @@ namespace PerfMonitor
         memory_old_peak = GetPeakMemoryConsumption();
         if (PreciseMemory)
           {
-          const __int64 amount = std::max<__int64>(memory_old_peak - memory_old_current, 0);
+          const std::uint64_t amount = (memory_old_peak > memory_old_current ? memory_old_peak - memory_old_current : 0);
           std::wcout << "(" << MemoryRecord{ amount } << ")";
           if (amount == 0)
             m_array = nullptr;
           else
             m_array = new std::uint8_t[amount];
-          for (__int64 i = 0; i < amount; ++i)
+          for (std::uint64_t i = 0; i < amount; ++i)
             m_array[i] = 0;
           memory_old_current = GetCurrentMemoryConsumption();
           memory_old_peak = GetPeakMemoryConsumption();
@@ -187,7 +168,7 @@ namespace PerfMonitor
       is_valid = false;
       if (WatchTime)
         time_counter = FinalizeTimeCounter(time_counter);
-      __int64 memory_new_current = 0, memory_new_peak = 0;
+      std::uint64_t memory_new_current = 0, memory_new_peak = 0;
       if (WatchMemory)
         {
         memory_new_current = GetCurrentMemoryConsumption();
@@ -197,16 +178,16 @@ namespace PerfMonitor
       Indention::PopIndention();
       if (WatchTime)
         {
-        std::wcout << (start_from_whitespace ? L" " : L"") << L"time: " << TimeRecord{ time_counter };
+        std::wcout << (start_from_whitespace ? L" " : L"") << L"time: " << TimeRecord{ static_cast<std::uint64_t>(time_counter) };
         start_from_whitespace = true;
         }
       if (WatchMemory)
         {
         std::wcout << (start_from_whitespace ? L" " : L"");
-        if (memory_new_current - memory_old_current > 0)
+        if (memory_new_current > memory_old_current)
           std::wcout << L"memory: +" << MemoryRecord{ memory_new_current - memory_old_current };
         else
-          std::wcout << L"memory: " << MemoryRecord{ memory_new_current - memory_old_current };
+          std::wcout << L"memory: -" << MemoryRecord{ memory_old_current - memory_new_current };
 
         std::wcout << L" peak: ";
         if (memory_new_peak == memory_old_peak)
@@ -218,9 +199,9 @@ namespace PerfMonitor
         delete m_array;
       }
 
-    __int64 time_counter;
-    __int64 memory_old_current;
-    __int64 memory_old_peak;
+    std::int64_t time_counter;
+    std::uint64_t memory_old_current;
+    std::uint64_t memory_old_peak;
     std::uint8_t* m_array;
     };
   }
@@ -229,7 +210,7 @@ namespace PerfMonitor
 extern "C"
   {  
   PERFMONITOR_API void ASM_IncrementCounter(size_t i_id);
-  PERFMONITOR_API void ASM_IncrementCounter2(size_t i_id, __int64 i_value);
+  PERFMONITOR_API void ASM_IncrementCounter2(size_t i_id, std::int64_t i_value);
   }
 
 namespace PerfMonitor
@@ -274,7 +255,7 @@ namespace PerfMonitor
         ASM_IncrementCounter2(m_id, m_value);
         }
 
-      __int64 m_value;
+      std::int64_t m_value;
       const size_t m_id;
       bool is_valid = true;
     };

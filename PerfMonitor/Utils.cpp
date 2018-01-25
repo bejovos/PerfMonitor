@@ -10,32 +10,32 @@ double frequency = 0;
 
 namespace PerfMonitor
   {
-  __int64 InitTimeCounter()
+  std::int64_t InitTimeCounter()
     {
     LARGE_INTEGER li;
     QueryPerformanceCounter(&li);
     return li.QuadPart;
     }
 
-  __int64 FinalizeTimeCounter(const __int64 counter)
+  std::int64_t FinalizeTimeCounter(const std::int64_t counter)
     {
     LARGE_INTEGER li;
     QueryPerformanceCounter(&li);
     return li.QuadPart - counter;
     }
 
-  __int64 GetCurrentMemoryConsumption()
+  std::uint64_t GetCurrentMemoryConsumption()
     {
     PROCESS_MEMORY_COUNTERS pmc;
     GetProcessMemoryInfo(::GetCurrentProcess(), &pmc, sizeof(pmc));
-    return static_cast<__int64>(pmc.WorkingSetSize);
+    return pmc.WorkingSetSize;
     }
 
-  __int64 GetPeakMemoryConsumption()
+  std::uint64_t GetPeakMemoryConsumption()
     {
     PROCESS_MEMORY_COUNTERS pmc;
     GetProcessMemoryInfo(::GetCurrentProcess(), &pmc, sizeof(pmc));
-    return static_cast<__int64>(pmc.PeakWorkingSetSize);    
+    return pmc.PeakWorkingSetSize;    
     }
 
   void SetColor(const Color i_color)

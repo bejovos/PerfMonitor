@@ -12,15 +12,15 @@
 #include <mutex>
 
 std::map<std::pair<int, std::string>, size_t> g_all_counters;
-std::deque<std::vector<__int64>> g_all_counters_raw;
+std::deque<std::vector<std::int64_t>> g_all_counters_raw;
 std::recursive_mutex g_mutex;
 
 namespace PerfMonitor
   {
-  std::vector<__int64> CombineAllCounters()
+  std::vector<std::int64_t> CombineAllCounters()
     {
     const size_t num_counters = g_all_counters.size();
-    std::vector<__int64> result(num_counters, 0);
+    std::vector<std::int64_t> result(num_counters, 0);
     for (const auto & ar : g_all_counters_raw)
       {
       for (size_t i=0; i<num_counters; ++i)
@@ -33,7 +33,7 @@ namespace PerfMonitor
     {
     if (g_all_counters_raw.empty() || g_all_counters.empty())
       return;
-    const std::vector<__int64> all_counters = CombineAllCounters();
+    const std::vector<std::int64_t> all_counters = CombineAllCounters();
     std::wcout << L"\n";
     if (g_all_counters_raw.size() != std::thread::hardware_concurrency())
       std::wcout << L"Num storages: " << g_all_counters_raw.size() << L"\n";
@@ -50,11 +50,11 @@ namespace PerfMonitor
         if (previous_category == 2)
           std::wcout << L"[STATISTIC]\n";
         }
-      const __int64 value = all_counters[v.second];
+      const std::int64_t value = all_counters[v.second];
       if (previous_category == 0)
-        std::wcout << L"  " << v.first.second << L" time: " << TimeRecord{value} << L"\n";
+        std::wcout << L"  " << v.first.second << L" time: " << TimeRecord{static_cast<std::uint64_t>(value)} << L"\n";
       if (previous_category == 1)
-        std::wcout << L"  " << v.first.second << L" memory: "  << MemoryRecord{value} << L"\n";
+        std::wcout << L"  " << v.first.second << L" memory: "  << MemoryRecord{static_cast<std::uint64_t>(value)} << L"\n";
       if (previous_category == 2)
         std::wcout << L"  " << v.first.second << L": "  << NumericRecord{value} << L"\n";
       }
@@ -94,13 +94,13 @@ CoutFinalizer g_finalizer;
 
 extern "C"
   {
-  __int64 * PrepareNewCounterStorage()
+  std::int64_t * PrepareNewCounterStorage()
     {
     g_mutex.lock();
     g_all_counters_raw.emplace_back();    
     auto & storage = g_all_counters_raw.back();
     storage.resize(1024, 0); // no more than 1024 counters
-    __int64 * result = storage.data();
+    std::int64_t * result = storage.data();
     g_mutex.unlock();
     return result;
     }

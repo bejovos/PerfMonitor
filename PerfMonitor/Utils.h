@@ -2,6 +2,8 @@
 
 #include "_API.h"
 
+#include <cstdint>
+
 namespace PerfMonitor
   {
   enum Color
@@ -12,10 +14,10 @@ namespace PerfMonitor
     Yellow = 14
     };
 
-  PERFMONITOR_API __int64 InitTimeCounter();
-  PERFMONITOR_API __int64 FinalizeTimeCounter(__int64);
-  PERFMONITOR_API __int64 GetCurrentMemoryConsumption();
-  PERFMONITOR_API __int64 GetPeakMemoryConsumption();
+  PERFMONITOR_API std::int64_t InitTimeCounter();
+  PERFMONITOR_API std::int64_t FinalizeTimeCounter(std::int64_t);
+  PERFMONITOR_API std::uint64_t GetCurrentMemoryConsumption();
+  PERFMONITOR_API std::uint64_t GetPeakMemoryConsumption();
   PERFMONITOR_API void SetColor(Color i_color);
   PERFMONITOR_API double GetFrequency();
   }
