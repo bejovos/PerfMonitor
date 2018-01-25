@@ -106,9 +106,13 @@ if (auto indendent_info = std::move(PerfMonitor::TimerSum( []() -> size_t { \
 
 #define CHECKE(value, expected) PerfMonitor::CheckEqual(value, expected)
 #define COLOR(color, ...) PerfMonitor::MakeColoredValue(color, __VA_ARGS__)
-#define INFO(...) if (auto indendent_info = (                     \
-  PerfMonitor::PrintIfArgsEmpty(true, __FILE__, __LINE__, __VA_ARGS__), \
-  PerfMonitor::Indention::Indent()) ){}else
+#define INFO(...)                                                          \
+if (auto indendent_info = [&]()                                            \
+  {                                                                        \
+  using namespace PerfMonitor;                                             \
+  PerfMonitor::PrintIfArgsEmpty(true, __FILE__, __LINE__, __VA_ARGS__);    \
+  return PerfMonitor::Indention::Indent();                                 \
+  }()){}else                                                               
 #endif
 
 // _ASSERT

@@ -26,7 +26,7 @@ namespace PerfMonitor
       {}
     };
 
-  template <class T, class Stream>
+  template <class Stream>
   Stream& operator <<(Stream& stream, const Color & i_value)
     {
     SetColor(i_value);
@@ -63,7 +63,8 @@ namespace PerfMonitor
     static void Print(Stream& stream, const Tuple& i_tuple)
       {
       Print<index - 1>(stream, i_tuple);
-      stream << " ";
+      if (std::is_same< std::decay<std::tuple_element<index,Tuple>::type>::type, Color>::value == false)
+        stream << " ";
       stream << std::get<index>(i_tuple);
       }
 
@@ -129,7 +130,8 @@ namespace PerfMonitor
         }
     if (i == -1)
       std::cout << i_file;
-    std::cout << "(" << i_line << ")";
+    std::cout << "(" << i_line << ")\n";
+    SetColor(Color::LightGray);
     return true;
     }
 
@@ -139,6 +141,7 @@ namespace PerfMonitor
     std::wcout << std::forward_as_tuple(args...);
     if (i_print_end)
       std::wcout << L"\n";
+    SetColor(Color::LightGray);
     return true;
     }
   }
