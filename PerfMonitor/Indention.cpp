@@ -1,29 +1,50 @@
 #include "Indention.h"
 #include "WriteToStream.h"
 
-#include <vector>
 #include <deque>
-#include <utility>
-#include <xlocbuf>
 #include <iomanip>
 #include <iostream>
+#include <memory>
+#include <utility>
+#include <vector>
+#include <xlocbuf>
 
-std::vector<std::pair<char, PerfMonitor::internal::IObject*>> indentions;
+struct IndentionsHolder : PerfMonitor::internal::IObject
+  {
+    std::vector<std::pair<char, IObject*>> m_indentions;
+    std::deque<char> m_unprinted_chars;
+    ~IndentionsHolder() override
+      {
+      if (is_valid == false)
+        return;
+      is_valid = false;
+      if (!m_indentions.empty())
+        std::cout << "  " << PerfMonitor::ColoredValue<char*>(
+          static_cast<char*>("[Execution aborted]\n"), PerfMonitor::Color::Red);
+
+      // Not a very elegant solution but during application termination this is the only thing we can do
+      while (!m_indentions.empty())
+        m_indentions.back().second->~IObject();
+      }
+  };
+
+std::shared_ptr<PerfMonitor::internal::IObject> p_indentions_holder;
 bool tab_needed = true;
 bool end_needed = false;
-std::deque<char> unprinted_chars;
+IndentionsHolder * p_indentions_holder_raw;
 
 namespace PerfMonitor
   {
   namespace Indention
     {
-    void Finalize()
+    std::shared_ptr<internal::IObject> GetIndentionsHolder()
       {
-      if (!indentions.empty())
-        std::cout << "  " << ColoredValue<char*>(static_cast<char*>("[Execution aborted]\n"), Color::Red);
-
-      while (!indentions.empty())
-        indentions.back().second->~IObject();
+      if (!p_indentions_holder)
+        {
+        p_indentions_holder = std::make_shared<IndentionsHolder>();
+        p_indentions_holder_raw = dynamic_cast<IndentionsHolder*>(p_indentions_holder.get());
+        }        
+      return p_indentions_holder;
       }
 
     bool SetEndNeeded(const bool i_end_needed)
@@ -35,12 +56,12 @@ namespace PerfMonitor
 
     void PushIndention(const char i_symbol, internal::IObject* ip_object)
       {
-      indentions.emplace_back(i_symbol, ip_object);
+      p_indentions_holder_raw->m_indentions.emplace_back(i_symbol, ip_object);
       }
 
     void PopIndention()
       {
-      indentions.pop_back();
+      p_indentions_holder_raw->m_indentions.pop_back();
       }
 
     template <class Char>
@@ -76,22 +97,23 @@ namespace PerfMonitor
             if (end_needed)
               {
               end_needed = false;
-              unprinted_chars.push_back('\n');
+              p_indentions_holder_raw->m_unprinted_chars.push_back('\n');
               tab_needed = true;
               }
             if (tab_needed)
               {
               tab_needed = false;
-              for (auto& ind : indentions)
-                unprinted_chars.emplace_back(ind.first);
+              for (auto& ind : p_indentions_holder_raw->m_indentions)
+                p_indentions_holder_raw->m_unprinted_chars.emplace_back(ind.first);
               }
-            unprinted_chars.push_back(static_cast<char>(*rStart));
+            p_indentions_holder_raw->m_unprinted_chars.push_back(static_cast<char>(*rStart));
             if (*rStart == '\n' || *rStart == '\r')
               tab_needed = true;
             }
 
-          for (; !unprinted_chars.empty() && wStart < wEnd; ++wStart, unprinted_chars.pop_front())
-            *wStart = unprinted_chars.front();
+          for (; !p_indentions_holder_raw->m_unprinted_chars.empty() && wStart < wEnd; 
+            ++wStart, p_indentions_holder_raw->m_unprinted_chars.pop_front())
+            *wStart = p_indentions_holder_raw->m_unprinted_chars.front();
 
           if (wStart != wEnd)
             res = std::codecvt_base::partial;
@@ -109,22 +131,11 @@ namespace PerfMonitor
           }
       };
     }
-  };
+  }
 
-struct IndentionInitialization
+struct StdSteamSwitcher : PerfMonitor::internal::IObject
   {
-    ~IndentionInitialization()
-      {      
-      std::cout.imbue(std::locale(std::locale::classic()));
-      std::cerr.imbue(std::locale(std::locale::classic()));
-      std::clog.imbue(std::locale(std::locale::classic()));
-
-      std::wcout.imbue(std::locale(std::locale::classic()));
-      std::wcerr.imbue(std::locale(std::locale::classic()));
-      std::wclog.imbue(std::locale(std::locale::classic()));
-      }
-
-    IndentionInitialization()
+    StdSteamSwitcher()
       {
       using namespace PerfMonitor::Indention;
       std::cout.imbue(std::locale(std::locale::classic(), new IndentFacet<char>()));
@@ -135,6 +146,33 @@ struct IndentionInitialization
       std::wcerr.imbue(std::locale(std::locale::classic(), new IndentFacet<wchar_t>()));
       std::wclog.imbue(std::locale(std::locale::classic(), new IndentFacet<wchar_t>()));
       }
+
+    ~StdSteamSwitcher() override
+      {      
+      if (is_valid == false)
+        return;
+      is_valid = false;
+      std::cout.imbue(std::locale(std::locale::classic()));
+      std::cerr.imbue(std::locale(std::locale::classic()));
+      std::clog.imbue(std::locale(std::locale::classic()));
+
+      std::wcout.imbue(std::locale(std::locale::classic()));
+      std::wcerr.imbue(std::locale(std::locale::classic()));
+      std::wclog.imbue(std::locale(std::locale::classic()));
+      }
   };
 
-IndentionInitialization indention_initialization;
+std::shared_ptr<PerfMonitor::internal::IObject> p_std_stream_switcher;
+
+namespace PerfMonitor
+  {
+  namespace Indention
+    {
+    std::shared_ptr<internal::IObject> GetStdStreamSwitcher()
+      {
+      if (!p_std_stream_switcher)
+        p_std_stream_switcher = std::make_shared<StdSteamSwitcher>();
+      return p_std_stream_switcher;
+      }
+    }
+  }

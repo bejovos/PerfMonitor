@@ -81,11 +81,20 @@ namespace PerfMonitor
 
 struct CoutFinalizer
   {
+    std::shared_ptr<PerfMonitor::internal::IObject> m_indentions_holder;
+    std::shared_ptr<PerfMonitor::internal::IObject> m_std_stream_switcher;
+    CoutFinalizer()
+      {
+      m_indentions_holder = PerfMonitor::Indention::GetIndentionsHolder();
+      m_std_stream_switcher = PerfMonitor::Indention::GetStdStreamSwitcher();    
+      }
     ~CoutFinalizer()
       {
       g_mutex.lock();
-      PerfMonitor::Indention::Finalize();
+      // Not a very elegant solution but during application termination this is the only thing we can do
+      m_indentions_holder.get()->~IObject();
       PerfMonitor::PrintAllCounters();
+      m_std_stream_switcher.get()->~IObject();
       g_mutex.unlock();
       }
   };
