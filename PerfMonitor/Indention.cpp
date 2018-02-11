@@ -9,18 +9,22 @@
 #include <vector>
 #include <xlocbuf>
 
+// ReSharper disable CppInconsistentNaming
+
 struct IndentionsHolder : PerfMonitor::internal::IObject
   {
-    std::vector<std::pair<char, IObject*>> m_indentions;
-    std::deque<char> m_unprinted_chars;
+    std::vector<std::pair<char, IObject*>> m_indentions;    
     ~IndentionsHolder() override
       {
       if (is_valid == false)
         return;
       is_valid = false;
       if (!m_indentions.empty())
-        std::cout << "  " << PerfMonitor::ColoredValue<char*>(
-          static_cast<char*>("[Execution aborted]\n"), PerfMonitor::Color::Red);
+        {
+        std::cout << PerfMonitor::Color::Red;
+        std::cout << "  [Execution aborted]\n";
+        std::cout << PerfMonitor::Color::LightGray;       
+        }
 
       // Not a very elegant solution but during application termination this is the only thing we can do
       while (!m_indentions.empty())
@@ -28,10 +32,19 @@ struct IndentionsHolder : PerfMonitor::internal::IObject
       }
   };
 
+struct StdSteamSwitcher : PerfMonitor::internal::IObject
+  {
+    std::deque<char> m_unprinted_chars;
+    StdSteamSwitcher();
+    ~StdSteamSwitcher() override;
+  };
+
 std::shared_ptr<PerfMonitor::internal::IObject> p_indentions_holder;
+std::shared_ptr<PerfMonitor::internal::IObject> p_std_stream_switcher;
 bool tab_needed = true;
 bool end_needed = false;
 IndentionsHolder * p_indentions_holder_raw;
+StdSteamSwitcher * p_std_stream_switcher_raw;
 
 namespace PerfMonitor
   {
@@ -79,7 +92,7 @@ namespace PerfMonitor
         typedef typename parent::extern_type extern_type;
         typedef typename parent::state_type state_type;
 
-        int& state(state_type& s) const { return *reinterpret_cast<int*>(&s); }
+        static int& state(state_type& s) { return *reinterpret_cast<int*>(&s); }
 
       protected:
         result do_out(
@@ -97,23 +110,23 @@ namespace PerfMonitor
             if (end_needed)
               {
               end_needed = false;
-              p_indentions_holder_raw->m_unprinted_chars.push_back('\n');
+              p_std_stream_switcher_raw->m_unprinted_chars.push_back('\n');
               tab_needed = true;
               }
             if (tab_needed)
               {
               tab_needed = false;
               for (auto& ind : p_indentions_holder_raw->m_indentions)
-                p_indentions_holder_raw->m_unprinted_chars.emplace_back(ind.first);
+                p_std_stream_switcher_raw->m_unprinted_chars.emplace_back(ind.first);
               }
-            p_indentions_holder_raw->m_unprinted_chars.push_back(static_cast<char>(*rStart));
+            p_std_stream_switcher_raw->m_unprinted_chars.push_back(static_cast<char>(*rStart));
             if (*rStart == '\n' || *rStart == '\r')
               tab_needed = true;
             }
 
-          for (; !p_indentions_holder_raw->m_unprinted_chars.empty() && wStart < wEnd; 
-            ++wStart, p_indentions_holder_raw->m_unprinted_chars.pop_front())
-            *wStart = p_indentions_holder_raw->m_unprinted_chars.front();
+          for (; !p_std_stream_switcher_raw->m_unprinted_chars.empty() && wStart < wEnd; 
+            ++wStart, p_std_stream_switcher_raw->m_unprinted_chars.pop_front())
+            *wStart = p_std_stream_switcher_raw->m_unprinted_chars.front();
 
           if (wStart != wEnd)
             res = std::codecvt_base::partial;
@@ -133,36 +146,31 @@ namespace PerfMonitor
     }
   }
 
-struct StdSteamSwitcher : PerfMonitor::internal::IObject
+StdSteamSwitcher::StdSteamSwitcher()
   {
-    StdSteamSwitcher()
-      {
-      using namespace PerfMonitor::Indention;
-      std::cout.imbue(std::locale(std::locale::classic(), new IndentFacet<char>()));
-      std::cerr.imbue(std::locale(std::locale::classic(), new IndentFacet<char>()));
-      std::clog.imbue(std::locale(std::locale::classic(), new IndentFacet<char>()));
+  using namespace PerfMonitor::Indention;
+  std::cout.imbue(std::locale(std::locale::classic(), new IndentFacet<char>()));
+  std::cerr.imbue(std::locale(std::locale::classic(), new IndentFacet<char>()));
+  std::clog.imbue(std::locale(std::locale::classic(), new IndentFacet<char>()));
 
-      std::wcout.imbue(std::locale(std::locale::classic(), new IndentFacet<wchar_t>()));
-      std::wcerr.imbue(std::locale(std::locale::classic(), new IndentFacet<wchar_t>()));
-      std::wclog.imbue(std::locale(std::locale::classic(), new IndentFacet<wchar_t>()));
-      }
+  std::wcout.imbue(std::locale(std::locale::classic(), new IndentFacet<wchar_t>()));
+  std::wcerr.imbue(std::locale(std::locale::classic(), new IndentFacet<wchar_t>()));
+  std::wclog.imbue(std::locale(std::locale::classic(), new IndentFacet<wchar_t>()));
+  }
 
-    ~StdSteamSwitcher() override
-      {      
-      if (is_valid == false)
-        return;
-      is_valid = false;
-      std::cout.imbue(std::locale(std::locale::classic()));
-      std::cerr.imbue(std::locale(std::locale::classic()));
-      std::clog.imbue(std::locale(std::locale::classic()));
+StdSteamSwitcher::~StdSteamSwitcher()
+  {
+  if (is_valid == false)
+    return;
+  is_valid = false;
+  std::cout.imbue(std::locale(std::locale::classic()));
+  std::cerr.imbue(std::locale(std::locale::classic()));
+  std::clog.imbue(std::locale(std::locale::classic()));
 
-      std::wcout.imbue(std::locale(std::locale::classic()));
-      std::wcerr.imbue(std::locale(std::locale::classic()));
-      std::wclog.imbue(std::locale(std::locale::classic()));
-      }
-  };
-
-std::shared_ptr<PerfMonitor::internal::IObject> p_std_stream_switcher;
+  std::wcout.imbue(std::locale(std::locale::classic()));
+  std::wcerr.imbue(std::locale(std::locale::classic()));
+  std::wclog.imbue(std::locale(std::locale::classic()));
+  }
 
 namespace PerfMonitor
   {
@@ -171,7 +179,10 @@ namespace PerfMonitor
     std::shared_ptr<internal::IObject> GetStdStreamSwitcher()
       {
       if (!p_std_stream_switcher)
+        {
         p_std_stream_switcher = std::make_shared<StdSteamSwitcher>();
+        p_std_stream_switcher_raw = dynamic_cast<StdSteamSwitcher*>(p_std_stream_switcher.get());
+        }        
       return p_std_stream_switcher;
       }
     }

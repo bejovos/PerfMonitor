@@ -10,6 +10,7 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <csignal>
 
 std::map<std::pair<int, std::string>, size_t> g_all_counters;
 std::deque<std::vector<std::int64_t>> g_all_counters_raw;
@@ -21,9 +22,9 @@ namespace PerfMonitor
     {
     const size_t num_counters = g_all_counters.size();
     std::vector<std::int64_t> result(num_counters, 0);
-    for (const auto & ar : g_all_counters_raw)
+    for (const auto& ar : g_all_counters_raw)
       {
-      for (size_t i=0; i<num_counters; ++i)
+      for (size_t i = 0; i < num_counters; ++i)
         result[i] += ar[i];
       }
     return result;
@@ -38,7 +39,7 @@ namespace PerfMonitor
     if (g_all_counters_raw.size() != std::thread::hardware_concurrency())
       std::wcout << L"Num storages: " << g_all_counters_raw.size() << L"\n";
     int previous_category = -1;
-    for (const auto & v : g_all_counters)
+    for (const auto& v : g_all_counters)
       {
       if (v.first.first != previous_category)
         {
@@ -52,24 +53,28 @@ namespace PerfMonitor
         }
       const std::int64_t value = all_counters[v.second];
       if (previous_category == 0)
-        std::wcout << L"  " << v.first.second << L" time: " << TimeRecord{static_cast<std::uint64_t>(value)} << L"\n";
+        std::wcout << L"  " << v.first.second << L" time: " << TimeRecord {
+          static_cast<std::uint64_t>(value)
+        } << L"\n";
       if (previous_category == 1)
-        std::wcout << L"  " << v.first.second << L" memory: "  << MemoryRecord{static_cast<std::uint64_t>(value)} << L"\n";
+        std::wcout << L"  " << v.first.second << L" memory: " << MemoryRecord {
+          static_cast<std::uint64_t>(value)
+        } << L"\n";
       if (previous_category == 2)
-        std::wcout << L"  " << v.first.second << L": "  << NumericRecord{value} << L"\n";
+        std::wcout << L"  " << v.first.second << L": " << NumericRecord { value } << L"\n";
       }
     }
-  
-  size_t RegisterCounter(int i_category, const char * i_name)
+
+  size_t RegisterCounter(int i_category, const char* i_name)
     {
     g_mutex.lock();
-    const auto it = g_all_counters.find({i_category, i_name});
+    const auto it = g_all_counters.find({ i_category, i_name });
     size_t index;
     if (it == g_all_counters.end())
       {
       index = g_all_counters.size();
       g_all_counters.emplace(std::make_pair(
-        std::make_pair(i_category, i_name), 
+        std::make_pair(i_category, i_name),
         index));
       }
     else
@@ -79,17 +84,27 @@ namespace PerfMonitor
     }
   }
 
-struct CoutFinalizer
+void TerminateHandler();
+void SIGSEGHandler(int i_sig);
+
+struct CoutFinalizer : PerfMonitor::internal::IObject
   {
     std::shared_ptr<PerfMonitor::internal::IObject> m_indentions_holder;
     std::shared_ptr<PerfMonitor::internal::IObject> m_std_stream_switcher;
+
     CoutFinalizer()
       {
       m_indentions_holder = PerfMonitor::Indention::GetIndentionsHolder();
-      m_std_stream_switcher = PerfMonitor::Indention::GetStdStreamSwitcher();    
+      m_std_stream_switcher = PerfMonitor::Indention::GetStdStreamSwitcher();
+      set_terminate(&TerminateHandler);
+      signal(SIGSEGV, SIGSEGHandler);
       }
+
     ~CoutFinalizer()
       {
+      if (is_valid == false)
+        return;
+      is_valid = false;
       g_mutex.lock();
       // Not a very elegant solution but during application termination this is the only thing we can do
       m_indentions_holder.get()->~IObject();
@@ -101,15 +116,40 @@ struct CoutFinalizer
 
 CoutFinalizer g_finalizer;
 
-extern "C"
+void SIGSEGHandler(int i_sig)
   {
-  std::int64_t * PrepareNewCounterStorage()
+  std::cout << PerfMonitor::Color::Red;
+  std::cout << "  [Segmentation faults]\n";
+  std::cout << PerfMonitor::Color::LightGray;
+  g_finalizer.~CoutFinalizer();
+  }
+
+void TerminateHandler()
+  {
+  std::cout << PerfMonitor::Color::Red;
+  std::cout << "  [Uncaught exception]\n";
+  const std::exception_ptr current_exception = std::current_exception();
+  try
+    {
+    std::rethrow_exception(current_exception);
+    }
+  catch (std::exception& ex)
+    {
+    std::cout << "  " << ex.what() << "\n";
+    }
+  std::cout << PerfMonitor::Color::LightGray;
+  g_finalizer.~CoutFinalizer();
+  }
+
+extern "C" 
+  {
+  std::int64_t* PrepareNewCounterStorage()
     {
     g_mutex.lock();
-    g_all_counters_raw.emplace_back();    
-    auto & storage = g_all_counters_raw.back();
+    g_all_counters_raw.emplace_back();
+    auto& storage = g_all_counters_raw.back();
     storage.resize(1024, 0); // no more than 1024 counters
-    std::int64_t * result = storage.data();
+    std::int64_t* result = storage.data();
     g_mutex.unlock();
     return result;
     }
