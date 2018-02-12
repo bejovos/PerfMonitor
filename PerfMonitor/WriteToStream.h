@@ -2,10 +2,11 @@
 
 #include "Utils.h"
 
-#include <tuple>
-#include <string>
 #include <codecvt>
+#include <iomanip>
 #include <iostream>
+#include <string>
+#include <tuple>
 
 template <class>
 class MMPoint3d;
@@ -56,20 +57,22 @@ namespace PerfMonitor
     return ColoredValue<std::tuple<Args...>>(std::forward_as_tuple(i_values...), i_color);
     }
 
-  template <class Tuple, class Stream>
+  template <class Tuple, class Stream, size_t index>
   struct PrintTuple
     {
-    template <size_t index>
     static void Print(Stream& stream, const Tuple& i_tuple)
       {
-      Print<index - 1>(stream, i_tuple);
-      if (std::is_same< std::decay<std::tuple_element<index,Tuple>::type>::type, Color>::value == false)
+      PrintTuple<Tuple, Stream, index - 1>::Print(stream, i_tuple);
+      if (std::is_same<typename std::decay<typename std::tuple_element<index,Tuple>::type>::type, Color>::value == false)
         stream << " ";
       stream << std::get<index>(i_tuple);
       }
+    };
 
-    template <>
-    static void Print<0>(Stream& stream, const Tuple& i_tuple)
+  template <class Tuple, class Stream>
+  struct PrintTuple<Tuple, Stream, 0>
+    {
+    static void Print(Stream& stream, const Tuple& i_tuple)
       {
       stream << std::get<0>(i_tuple);
       }
@@ -78,7 +81,7 @@ namespace PerfMonitor
   template <class Stream, class... Args>
   Stream& operator <<(Stream& stream, const std::tuple<Args...>& i_tuple)
     {
-    PrintTuple<std::tuple<Args...>, Stream>::Print < sizeof...(Args)-1 >(stream, i_tuple);
+    PrintTuple<std::tuple<Args...>, Stream, sizeof...(Args) - 1>::Print(stream, i_tuple);
     return stream;
     }
 
