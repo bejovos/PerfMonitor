@@ -47,9 +47,9 @@ namespace PerfMonitor
   }
 
 #define STRING_TO_CLASS(string, class_name)                                               \
-struct class_name_impl                                                                    \
+struct class_name ## _impl                                                                \
   {                                                                                       \
     static constexpr const char * Str() { return string; }                                \
   };                                                                                      \
-using class_name = typename PerfMonitor::internal::StringToClass<class_name_impl>::type
+using class_name = typename PerfMonitor::internal::StringToClass<class_name ## _impl>::type
 

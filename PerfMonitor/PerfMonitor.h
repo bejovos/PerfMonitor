@@ -73,15 +73,20 @@
 #if OPTIONS_COUNTERS
 #undef STATICCOUNTER
 
+#define PM_CONCATENATE(x, y) x ## y
+#define PM_QUOTE(x) PM_QUOTE2(x)
+#define PM_QUOTE2(x) # x
+#define PM_FILE_LINE PM_CONCATENATE(__FILE__, ":") ## PM_QUOTE(__LINE__)
+#define PM_ANONYMOUS_STRING(string) ((PerfMonitor::internal::c_strlen(string) == 0) ? PM_FILE_LINE : string)
 /**
  * @brief Thread-safe static counter. By default each call adds 1 to the internal counter.
  * Usage examples:
  * @code
  * STATICCOUNTER("Name"); @endcode
  */
-#define STATICCOUNTER(string)                                          \
-  ([&](){                                                              \
-    STRING_TO_CLASS(string, string_in_class);                          \
+#define STATICCOUNTER(...)                                                              \
+  ([&](){                                                                               \
+    STRING_TO_CLASS(PM_ANONYMOUS_STRING("" ## __VA_ARGS__), string_in_class);           \
     ASM_IncrementCounter(PerfMonitor::CounterInitialization<2, string_in_class>::id.id);\
   })()
 #endif
