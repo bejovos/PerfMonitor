@@ -30,6 +30,14 @@ namespace PerfMonitor
     return result;
     }
 
+  std::int64_t GetTotalCounterValue(const size_t i_id)
+    {
+    std::int64_t result = 0;
+    for (const auto& ar : g_all_counters_raw)
+      result += ar[i_id];
+    return result;
+    }
+
   void PrintAllCounters()
     {
     if (g_all_counters_raw.empty() || g_all_counters.empty())

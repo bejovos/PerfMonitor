@@ -217,6 +217,9 @@ namespace PerfMonitor
   {
   PERFMONITOR_API size_t RegisterCounter(int i_category, const char * i_name);
 
+  // not thread safe
+  PERFMONITOR_API std::int64_t GetTotalCounterValue(size_t i_id);
+  
   struct CounterId
     {
     explicit CounterId(const int i_category, const char * i_name)
@@ -235,12 +238,12 @@ namespace PerfMonitor
 
   struct TimerSum : internal::non_copyable, internal::convertable_to_bool_false
     {
-      explicit TimerSum(const size_t i_id)
-        : m_value(InitTimeCounter()), m_id(i_id)
+      explicit TimerSum(const size_t i_offset)
+        : m_value(InitTimeCounter()), m_offset(i_offset)
         {}
 
       TimerSum(TimerSum&& i_object) noexcept
-        : m_value(i_object.m_value), m_id(i_object.m_id)
+        : m_value(i_object.m_value), m_offset(i_object.m_offset)
         {
         assert(i_object.is_valid);
         i_object.is_valid = false;        
@@ -252,11 +255,16 @@ namespace PerfMonitor
           return;
         is_valid = true;        
         m_value = FinalizeTimeCounter(m_value);
-        ASM_IncrementCounter2(m_id, m_value);
+        ASM_IncrementCounter2(m_offset, m_value);
+        }
+
+      static TimeRecord GetTotalValue(const size_t i_offset)
+        {
+        return {static_cast<std::uint64_t>(GetTotalCounterValue(i_offset / 8))};
         }
 
       std::int64_t m_value;
-      const size_t m_id;
+      const size_t m_offset;
       bool is_valid = true;
     };
   }

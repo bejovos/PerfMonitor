@@ -27,6 +27,7 @@
 #define TIMERSUM(...)
 #define STATICCOUNTER(...) 0
 #define PASSERT(...) if(true){}else
+#define TIMERSUM_GET size_t{0}
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -94,12 +95,19 @@
 // TIMERSUM
 #if OPTIONS_WATCHERS && OPTIONS_COUNTERS
 #undef TIMERSUM
+#undef TIMERSUM_GET
 
 #define TIMERSUM(string)                                              \
 if (auto indendent_info = std::move(PerfMonitor::TimerSum( []() -> size_t { \
   STRING_TO_CLASS(string, string_in_class);                           \
   return PerfMonitor::CounterInitialization<0, string_in_class>::id.id;     \
 }() )) ){} else
+
+#define TIMERSUM_GET(string)                                              \
+PerfMonitor::TimerSum::GetTotalValue([]() -> size_t {                     \
+  STRING_TO_CLASS(string, string_in_class);                               \
+  return PerfMonitor::CounterInitialization<0, string_in_class>::id.id;   \
+}())
 
 #endif 
 
