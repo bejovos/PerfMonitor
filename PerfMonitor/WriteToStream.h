@@ -63,7 +63,7 @@ namespace PerfMonitor
     static void Print(Stream& stream, const Tuple& i_tuple)
       {
       PrintTuple<Tuple, Stream, index - 1>::Print(stream, i_tuple);
-      if (std::is_same<typename std::decay<typename std::tuple_element<index,Tuple>::type>::type, Color>::value == false)
+      if (std::is_same<typename std::decay<typename std::tuple_element<index - 1,Tuple>::type>::type, Color>::value == false)
         stream << " ";
       stream << std::get<index>(i_tuple);
       }
@@ -89,6 +89,14 @@ namespace PerfMonitor
   Stream& operator <<(Stream& stream, const std::pair<Type1, Type2>& p)
     {
     stream << p.first << " " << p.second;
+    return stream;
+    }
+
+  template <class Stream, class Type, size_t Count>
+  Stream& operator <<(Stream& stream, const std::array<Type, Count>& ar)
+    {
+    for (auto & v : ar)
+      stream << v << " ";
     return stream;
     }
 
