@@ -11,6 +11,7 @@
 #include <iostream>
 #include <iomanip>
 #include <algorithm>
+#include <chrono>
 
 // Records
 namespace PerfMonitor
@@ -31,9 +32,9 @@ namespace PerfMonitor
     };
 
   template <class Stream>
-  Stream& operator <<(Stream& stream, const TimeRecord& record)
+  Stream& operator <<(Stream& stream, const std::chrono::microseconds & record)
     {
-    const double time = record.counter / GetFrequency();
+    const double time = static_cast<double>(record.count());
     auto precision = stream.precision();
     auto flags = stream.flags();
     stream << std::fixed;
@@ -178,7 +179,7 @@ namespace PerfMonitor
       Indention::PopIndention();
       if (WatchTime)
         {
-        std::wcout << (start_from_whitespace ? L" " : L"") << L"time: " << TimeRecord{ static_cast<std::uint64_t>(time_counter) };
+        std::wcout << (start_from_whitespace ? L" " : L"") << L"time: " << std::chrono::microseconds(static_cast<long long>(time_counter * GetInvFrequency()));
         start_from_whitespace = true;
         }
       if (WatchMemory)
@@ -219,13 +220,18 @@ namespace PerfMonitor
 
   // not thread safe
   PERFMONITOR_API std::int64_t GetTotalCounterValue(size_t i_id);
+  // not thread safe
+  PERFMONITOR_API void SetTotalCounterValue(size_t i_id, std::int64_t i_value);
   
   struct CounterId
     {
     explicit CounterId(const int i_category, const char * i_name)
-      : id(RegisterCounter(i_category, i_name) * 8) // multiply by 8 to transform counter into offset
+      : m_offset(RegisterCounter(i_category, i_name) * 8) // multiply by 8 to transform counter into offset
       {}
-    const size_t id;
+    size_t GetId() const { return m_offset / 8; }
+    size_t GetOffset() const { return m_offset; }
+  private:
+    const size_t m_offset;
     };
 
   template <int Category, class TString>
@@ -235,6 +241,19 @@ namespace PerfMonitor
     };
   template <int Category, class TString>
   const CounterId CounterInitialization<Category, TString>::id(Category, TString::MakeString().c_str());
+
+  namespace StaticCounter
+    {
+      static size_t GetTotalValue(const size_t i_id)
+        {
+        return GetTotalCounterValue(i_id);
+        }
+
+      static void SetTotalValue(const size_t i_id, size_t i_value)
+        {
+        return SetTotalCounterValue(i_id, i_value);
+        }
+    }
 
   struct TimerSum : internal::non_copyable, internal::convertable_to_bool_false
     {
@@ -258,9 +277,14 @@ namespace PerfMonitor
         ASM_IncrementCounter2(m_offset, m_value);
         }
 
-      static TimeRecord GetTotalValue(const size_t i_offset)
+      static std::chrono::microseconds GetTotalValue(const size_t i_id)
         {
-        return {static_cast<std::uint64_t>(GetTotalCounterValue(i_offset / 8))};
+        return std::chrono::microseconds(static_cast<long long>(GetTotalCounterValue(i_id) * GetInvFrequency()));
+        }
+
+      static void SetTotalValue(const size_t i_id, std::chrono::microseconds i_value)
+        {
+        return SetTotalCounterValue(i_id, static_cast<std::int64_t>(i_value.count() / GetInvFrequency()));
         }
 
       std::int64_t m_value;

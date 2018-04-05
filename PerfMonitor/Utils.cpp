@@ -43,7 +43,7 @@ namespace PerfMonitor
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), static_cast<WORD>(i_color));
     }
 
-  double GetFrequency()
+  double GetInvFrequency()
     {
     return frequency;
     }
@@ -56,6 +56,7 @@ struct FrequencyInitilization
     LARGE_INTEGER li;
     QueryPerformanceFrequency(&li);
     frequency = double(li.QuadPart) / 1000000.0;
+    frequency = 1 / frequency;
     }
   };
 

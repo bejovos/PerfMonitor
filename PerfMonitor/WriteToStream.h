@@ -8,10 +8,8 @@
 #include <string>
 #include <tuple>
 
-template <class>
-class MMPoint3d;
-template <class>
-class MMPoint3dIntegerTypes;
+template <class type, size_t dim>
+class MMVector;
 
 namespace PerfMonitor
   {
@@ -100,24 +98,15 @@ namespace PerfMonitor
     return stream;
     }
 
-  template <class Stream, class Type>
-  Stream& operator <<(Stream& stream, const MMPoint3d<Type>& point)
+  template <class Stream, class Type, size_t dim>
+  Stream& operator <<(Stream& stream, const MMVector<Type, dim>& point)
     {
     auto precision = stream.precision();
     auto flags = stream.flags();
-    stream << std::fixed << std::setprecision(1) << point[0] << " " << point[1] << " " << point[2];
-    stream.flags(flags);
-    stream.precision(precision);
-    return stream;
-    }
-
-  template <class Stream, class Type>
-  Stream& operator <<(Stream& stream, const MMPoint3dIntegerTypes<Type>& point)
-    {
-    auto precision = stream.precision();
-    auto flags = stream.flags();
-    stream << std::setprecision(2);
-    stream << point[0] << " " << point[1] << " " << point[2];
+    stream << std::fixed << std::setprecision(2);
+    for (size_t i=0; i<dim - 1; ++i)
+      stream << point[i] << " ";
+    stream << point[dim - 1];
     stream.flags(flags);
     stream.precision(precision);
     return stream;

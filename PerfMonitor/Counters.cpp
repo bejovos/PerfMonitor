@@ -12,17 +12,22 @@
 #include <mutex>
 #include <csignal>
 
-std::map<std::pair<int, std::string>, size_t> g_all_counters;
-std::deque<std::vector<std::int64_t>> g_all_counters_raw;
-std::recursive_mutex g_mutex;
+struct CounterStorage : PerfMonitor::internal::IObject
+  {
+  std::map<std::pair<int, std::string>, size_t> m_all_counters;
+  std::deque<std::vector<std::int64_t>> m_all_counters_raw;
+  std::recursive_mutex m_mutex;
+  };
+
+CounterStorage * p_counter_storage = nullptr;
 
 namespace PerfMonitor
   {
   std::vector<std::int64_t> CombineAllCounters()
     {
-    const size_t num_counters = g_all_counters.size();
+    const size_t num_counters = p_counter_storage->m_all_counters.size();
     std::vector<std::int64_t> result(num_counters, 0);
-    for (const auto& ar : g_all_counters_raw)
+    for (const auto& ar : p_counter_storage->m_all_counters_raw)
       {
       for (size_t i = 0; i < num_counters; ++i)
         result[i] += ar[i];
@@ -32,22 +37,31 @@ namespace PerfMonitor
 
   std::int64_t GetTotalCounterValue(const size_t i_id)
     {
+    std::lock_guard<std::recursive_mutex> lock(p_counter_storage->m_mutex);
     std::int64_t result = 0;
-    for (const auto& ar : g_all_counters_raw)
+    for (const auto& ar : p_counter_storage->m_all_counters_raw)
       result += ar[i_id];
     return result;
     }
 
+  void SetTotalCounterValue(size_t i_id, std::int64_t i_value)
+    {
+    std::lock_guard<std::recursive_mutex> lock(p_counter_storage->m_mutex);
+    for (auto& ar : p_counter_storage->m_all_counters_raw)
+      ar[i_id] = 0;
+    p_counter_storage->m_all_counters_raw.front()[i_id] = i_value;
+    }
+
   void PrintAllCounters()
     {
-    if (g_all_counters_raw.empty() || g_all_counters.empty())
+    if (p_counter_storage->m_all_counters_raw.empty() || p_counter_storage->m_all_counters.empty())
       return;
     const std::vector<std::int64_t> all_counters = CombineAllCounters();
     std::wcout << L"\n";
-    if (g_all_counters_raw.size() != std::thread::hardware_concurrency())
-      std::wcout << L"Num storages: " << g_all_counters_raw.size() << L"\n";
+    if (p_counter_storage->m_all_counters_raw.size() != std::thread::hardware_concurrency())
+      std::wcout << L"Num storages: " << p_counter_storage->m_all_counters_raw.size() << L"\n";
     int previous_category = -1;
-    for (const auto& v : g_all_counters)
+    for (const auto& v : p_counter_storage->m_all_counters)
       {
       if (v.first.first != previous_category)
         {
@@ -61,13 +75,9 @@ namespace PerfMonitor
         }
       const std::int64_t value = all_counters[v.second];
       if (previous_category == 0)
-        std::wcout << L"  " << v.first.second << L" time: " << TimeRecord {
-          static_cast<std::uint64_t>(value)
-        } << L"\n";
+        std::wcout << L"  " << v.first.second << L" time: " << std::chrono::microseconds(static_cast<long long>(value * GetInvFrequency())) << L"\n";
       if (previous_category == 1)
-        std::wcout << L"  " << v.first.second << L" memory: " << MemoryRecord {
-          static_cast<std::uint64_t>(value)
-        } << L"\n";
+        std::wcout << L"  " << v.first.second << L" memory: " << MemoryRecord { static_cast<std::uint64_t>(value) } << L"\n";
       if (previous_category == 2)
         std::wcout << L"  " << v.first.second << L": " << NumericRecord { value } << L"\n";
       }
@@ -75,19 +85,18 @@ namespace PerfMonitor
 
   size_t RegisterCounter(int i_category, const char* i_name)
     {
-    g_mutex.lock();
-    const auto it = g_all_counters.find({ i_category, i_name });
+    std::lock_guard<std::recursive_mutex> lock(p_counter_storage->m_mutex);
+    const auto it = p_counter_storage->m_all_counters.find({ i_category, i_name });
     size_t index;
-    if (it == g_all_counters.end())
+    if (it == p_counter_storage->m_all_counters.end())
       {
-      index = g_all_counters.size();
-      g_all_counters.emplace(std::make_pair(
+      index = p_counter_storage->m_all_counters.size();
+      p_counter_storage->m_all_counters.emplace(std::make_pair(
         std::make_pair(i_category, i_name),
         index));
       }
     else
       index = it->second;
-    g_mutex.unlock();
     return index;
     }
   }
@@ -99,11 +108,14 @@ struct CoutFinalizer : PerfMonitor::internal::IObject
   {
     std::shared_ptr<PerfMonitor::internal::IObject> m_indentions_holder;
     std::shared_ptr<PerfMonitor::internal::IObject> m_std_stream_switcher;
+    std::shared_ptr<PerfMonitor::internal::IObject> m_counter_storage;
 
     CoutFinalizer()
       {
       m_indentions_holder = PerfMonitor::Indention::GetIndentionsHolder();
       m_std_stream_switcher = PerfMonitor::Indention::GetStdStreamSwitcher();
+      m_counter_storage = std::make_shared<CounterStorage>();
+      p_counter_storage = static_cast<CounterStorage*>(m_counter_storage.get());
       set_terminate(&TerminateHandler);
       signal(SIGSEGV, SIGSEGHandler);
       }
@@ -113,12 +125,10 @@ struct CoutFinalizer : PerfMonitor::internal::IObject
       if (is_valid == false)
         return;
       is_valid = false;
-      g_mutex.lock();
       // Not a very elegant solution but during application termination this is the only thing we can do
       m_indentions_holder.get()->~IObject();
       PerfMonitor::PrintAllCounters();
       m_std_stream_switcher.get()->~IObject();
-      g_mutex.unlock();
       }
   };
 
@@ -153,12 +163,11 @@ extern "C"
   {
   std::int64_t* PrepareNewCounterStorage()
     {
-    g_mutex.lock();
-    g_all_counters_raw.emplace_back();
-    auto& storage = g_all_counters_raw.back();
+    std::lock_guard<std::recursive_mutex> lock(p_counter_storage->m_mutex);
+    p_counter_storage->m_all_counters_raw.emplace_back();
+    auto& storage = p_counter_storage->m_all_counters_raw.back();
     storage.resize(1024, 0); // no more than 1024 counters
     std::int64_t* result = storage.data();
-    g_mutex.unlock();
     return result;
     }
   }

@@ -24,10 +24,15 @@
 #define TIMER(...)
 #define MEMORY(...)
 #define TIMERMEMORY
+#define TIMERSUM_SCOPED(...)
 #define TIMERSUM(...)
-#define STATICCOUNTER(...) 0
+#define TIMERSUM_GET(...) std::chrono::microseconds{0}
+#define TIMERSUM_SET(...) 
+#define STATICCOUNTER(...)
+#define STATICCOUNTER_GET(...) size_t{0}
+#define STATICCOUNTER_SET(...)
 #define PASSERT(...) if(true){}else
-#define TIMERSUM_GET size_t{0}
+
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -73,6 +78,8 @@
 // STATICCOUNTER
 #if OPTIONS_COUNTERS
 #undef STATICCOUNTER
+#undef STATICCOUNTER_GET
+#undef STATICCOUNTER_SET
 
 #define PM_CONCATENATE(x, y) x ## y
 #define PM_QUOTE(x) PM_QUOTE2(x)
@@ -85,29 +92,58 @@
  * @code
  * STATICCOUNTER("Name"); @endcode
  */
-#define STATICCOUNTER(...)                                                              \
-  ([&](){                                                                               \
-    STRING_TO_CLASS(PM_ANONYMOUS_STRING("" ## __VA_ARGS__), string_in_class);           \
-    ASM_IncrementCounter(PerfMonitor::CounterInitialization<2, string_in_class>::id.id);\
+#define STATICCOUNTER(...)                                                                       \
+  ([&](){                                                                                        \
+    STRING_TO_CLASS(PM_ANONYMOUS_STRING("" ## __VA_ARGS__), string_in_class);                    \
+    ASM_IncrementCounter(PerfMonitor::CounterInitialization<2, string_in_class>::id.GetOffset());\
   })()
+
+#define STATICCOUNTER_GET(counter_name)                                                      \
+  PerfMonitor::StaticCounter::GetTotalValue([&](){                                           \
+    STRING_TO_CLASS(counter_name, string_in_class);                                          \
+    return PerfMonitor::CounterInitialization<2, string_in_class>::id.GetId();               \
+  }())
+
+#define STATICCOUNTER_SET(counter_name, value)                                               \
+  PerfMonitor::StaticCounter::SetTotalValue([&](){                                           \
+    STRING_TO_CLASS(counter_name, string_in_class);                                          \
+    return PerfMonitor::CounterInitialization<2, string_in_class>::id.GetId();               \
+  }(), value)
+
 #endif
 
 // TIMERSUM
 #if OPTIONS_WATCHERS && OPTIONS_COUNTERS
 #undef TIMERSUM
+#undef TIMERSUM_SCOPED
 #undef TIMERSUM_GET
+#undef TIMERSUM_SET
 
-#define TIMERSUM(string)                                              \
-if (auto indendent_info = std::move(PerfMonitor::TimerSum( []() -> size_t { \
-  STRING_TO_CLASS(string, string_in_class);                           \
-  return PerfMonitor::CounterInitialization<0, string_in_class>::id.id;     \
+#define TIMERSUM_SCOPED(string)                                                      \
+PerfMonitor::TimerSum temporary_timer_1([]() -> size_t {                             \
+  STRING_TO_CLASS(string, string_in_class);                                          \
+  return PerfMonitor::CounterInitialization<0, string_in_class>::id.GetOffset();     \
+}())
+
+
+#define TIMERSUM(string)                                                             \
+if (auto indendent_info = std::move(PerfMonitor::TimerSum( []() -> size_t {          \
+  STRING_TO_CLASS(string, string_in_class);                                          \
+  return PerfMonitor::CounterInitialization<0, string_in_class>::id.GetOffset();     \
 }() )) ){} else
 
-#define TIMERSUM_GET(string)                                              \
-PerfMonitor::TimerSum::GetTotalValue([]() -> size_t {                     \
-  STRING_TO_CLASS(string, string_in_class);                               \
-  return PerfMonitor::CounterInitialization<0, string_in_class>::id.id;   \
+#define TIMERSUM_GET(counter_name)                                              \
+PerfMonitor::TimerSum::GetTotalValue([]() -> size_t {                           \
+  STRING_TO_CLASS(counter_name, string_in_class);                               \
+  return PerfMonitor::CounterInitialization<0, string_in_class>::id.GetId();    \
 }())
+
+#define TIMERSUM_SET(counter_name, microseconds)                                \
+PerfMonitor::TimerSum::SetTotalValue([]() -> size_t {                           \
+  STRING_TO_CLASS(counter_name, string_in_class);                               \
+  return PerfMonitor::CounterInitialization<0, string_in_class>::id.GetId();    \
+}(), microseconds)
+
 
 #endif 
 
