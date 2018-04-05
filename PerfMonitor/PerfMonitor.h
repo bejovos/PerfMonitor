@@ -41,6 +41,7 @@
 #include "BreakInDestructor.h"
 #include "Indention.h"
 #include "Counters.h"
+#include "TimeAndMemoryWatcher.h"
 
 // TIMER
 #if OPTIONS_WATCHERS
@@ -56,7 +57,7 @@
 #define TIMER_STOP() temporary_timer_1.~TimeAndMemoryWatcher()
 
 /**
-* @rief Timer. Prints elapsed time to cout in its destructor. Nested scope is indented.
+* @brief Timer. Prints elapsed time to cout in its destructor. Nested scope is indented.
 * Usage examples:
 * @code
 * TIMER("Calculation")

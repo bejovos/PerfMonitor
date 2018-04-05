@@ -3,36 +3,29 @@
 #include "_API.h"
 #include "IObject.h"
 #include "Utils.h"
-#include "Indention.h"
 
 #include <cstdint>
 #include <sstream>
 #include <cassert>
 #include <iostream>
 #include <iomanip>
-#include <algorithm>
 #include <chrono>
 
 // Records
 namespace PerfMonitor
   {
-  struct TimeRecord
-    {
-    std::uint64_t counter;
-    };
-
   struct MemoryRecord
     {
-    std::uint64_t counter;
+      std::uint64_t counter;
     };
 
   struct NumericRecord
     {
-    std::int64_t counter;
+      std::int64_t counter;
     };
 
   template <class Stream>
-  Stream& operator <<(Stream& stream, const std::chrono::microseconds & record)
+  Stream& operator <<(Stream& stream, const std::chrono::microseconds& record)
     {
     const double time = static_cast<double>(record.count());
     auto precision = stream.precision();
@@ -114,165 +107,79 @@ namespace PerfMonitor
     }
   }
 
-namespace PerfMonitor
-  {
-  template <bool WatchTime, bool WatchMemory, bool PreciseMemory>
-  struct TimeAndMemoryWatcher : internal::non_copyable, internal::IObject, internal::convertable_to_bool_false
-    {
-    TimeAndMemoryWatcher()
-      {
-      Indention::PushIndention(char(179), this);
-      InitCounter();
-      Indention::SetEndNeeded(true);
-      }
-
-    TimeAndMemoryWatcher(TimeAndMemoryWatcher && i_watcher) noexcept
-      {
-      assert(i_watcher.is_valid);
-      i_watcher.is_valid = false;
-      Indention::PopIndention();
-      Indention::PushIndention(char(179), this);
-      time_counter = i_watcher.time_counter;
-      memory_old_current = i_watcher.memory_old_current;
-      memory_old_peak = i_watcher.memory_old_peak;
-      m_array = i_watcher.m_array;
-      }
-
-    void InitCounter()
-      {
-      if (WatchMemory)
-        {
-        memory_old_current = GetCurrentMemoryConsumption();
-        memory_old_peak = GetPeakMemoryConsumption();
-        if (PreciseMemory)
-          {
-          const std::uint64_t amount = (memory_old_peak > memory_old_current ? memory_old_peak - memory_old_current : 0);
-          std::wcout << "(" << MemoryRecord{ amount } << ")";
-          if (amount == 0)
-            m_array = nullptr;
-          else
-            m_array = new std::uint8_t[amount];
-          for (std::uint64_t i = 0; i < amount; ++i)
-            m_array[i] = 0;
-          memory_old_current = GetCurrentMemoryConsumption();
-          memory_old_peak = GetPeakMemoryConsumption();
-          }
-        }
-      if (WatchTime)
-        time_counter = InitTimeCounter();
-      }
-
-    ~TimeAndMemoryWatcher() override
-      {
-      if (is_valid == false)
-        return;
-      is_valid = false;
-      if (WatchTime)
-        time_counter = FinalizeTimeCounter(time_counter);
-      std::uint64_t memory_new_current = 0, memory_new_peak = 0;
-      if (WatchMemory)
-        {
-        memory_new_current = GetCurrentMemoryConsumption();
-        memory_new_peak = GetPeakMemoryConsumption();
-        }
-      bool start_from_whitespace = Indention::SetEndNeeded(false);
-      Indention::PopIndention();
-      if (WatchTime)
-        {
-        std::wcout << (start_from_whitespace ? L" " : L"") << L"time: " << std::chrono::microseconds(static_cast<long long>(time_counter * GetInvFrequency()));
-        start_from_whitespace = true;
-        }
-      if (WatchMemory)
-        {
-        std::wcout << (start_from_whitespace ? L" " : L"");
-        if (memory_new_current > memory_old_current)
-          std::wcout << L"memory: +" << MemoryRecord{ memory_new_current - memory_old_current };
-        else
-          std::wcout << L"memory: -" << MemoryRecord{ memory_old_current - memory_new_current };
-
-        std::wcout << L" peak: ";
-        if (memory_new_peak == memory_old_peak)
-          std::wcout << L"< ";
-        std::wcout << MemoryRecord{ memory_new_peak - memory_old_current };
-        }
-      std::wcout << L"\n";
-      if (PreciseMemory)
-        delete m_array;
-      }
-
-    std::int64_t time_counter;
-    std::uint64_t memory_old_current;
-    std::uint64_t memory_old_peak;
-    std::uint8_t* m_array;
-    };
-  }
-
 // Static counters, TimerSum
-extern "C"
-  {  
-  PERFMONITOR_API void ASM_IncrementCounter(size_t i_id);
-  PERFMONITOR_API void ASM_IncrementCounter2(size_t i_id, std::int64_t i_value);
-  }
+extern "C" {
+PERFMONITOR_API void ASM_IncrementCounter(size_t i_id);
+PERFMONITOR_API void ASM_IncrementCounter2(size_t i_id, std::int64_t i_value);
+}
 
 namespace PerfMonitor
   {
-  PERFMONITOR_API size_t RegisterCounter(int i_category, const char * i_name);
+  PERFMONITOR_API size_t RegisterCounter(int i_category, const char* i_name);
 
   // not thread safe
   PERFMONITOR_API std::int64_t GetTotalCounterValue(size_t i_id);
   // not thread safe
   PERFMONITOR_API void SetTotalCounterValue(size_t i_id, std::int64_t i_value);
-  
+
   struct CounterId
     {
-    explicit CounterId(const int i_category, const char * i_name)
-      : m_offset(RegisterCounter(i_category, i_name) * 8) // multiply by 8 to transform counter into offset
-      {}
-    size_t GetId() const { return m_offset / 8; }
-    size_t GetOffset() const { return m_offset; }
-  private:
-    const size_t m_offset;
+      explicit CounterId(const int i_category, const char* i_name)
+        : m_offset(RegisterCounter(i_category, i_name) * 8) // multiply by 8 to transform counter into offset
+        {
+        }
+
+      size_t GetId() const { return m_offset / 8; }
+
+      size_t GetOffset() const { return m_offset; }
+
+    private:
+      const size_t m_offset;
     };
 
   template <int Category, class TString>
   struct CounterInitialization
     {
-    static const CounterId id;
+      static const CounterId id;
     };
+
   template <int Category, class TString>
   const CounterId CounterInitialization<Category, TString>::id(Category, TString::MakeString().c_str());
 
   namespace StaticCounter
     {
-      static size_t GetTotalValue(const size_t i_id)
-        {
-        return GetTotalCounterValue(i_id);
-        }
+    static size_t GetTotalValue(const size_t i_id)
+      {
+      return GetTotalCounterValue(i_id);
+      }
 
-      static void SetTotalValue(const size_t i_id, size_t i_value)
-        {
-        return SetTotalCounterValue(i_id, i_value);
-        }
+    static void SetTotalValue(const size_t i_id, size_t i_value)
+      {
+      return SetTotalCounterValue(i_id, i_value);
+      }
     }
 
   struct TimerSum : internal::non_copyable, internal::convertable_to_bool_false
     {
       explicit TimerSum(const size_t i_offset)
-        : m_value(InitTimeCounter()), m_offset(i_offset)
-        {}
+        : m_value(InitTimeCounter())
+        , m_offset(i_offset)
+        {
+        }
 
       TimerSum(TimerSum&& i_object) noexcept
-        : m_value(i_object.m_value), m_offset(i_object.m_offset)
+        : m_value(i_object.m_value)
+        , m_offset(i_object.m_offset)
         {
         assert(i_object.is_valid);
-        i_object.is_valid = false;        
+        i_object.is_valid = false;
         }
 
       ~TimerSum()
         {
         if (is_valid == false)
           return;
-        is_valid = true;        
+        is_valid = true;
         m_value = FinalizeTimeCounter(m_value);
         ASM_IncrementCounter2(m_offset, m_value);
         }
