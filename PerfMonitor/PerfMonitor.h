@@ -12,9 +12,6 @@
 #ifndef OPTIONS_DEBUG
   #define OPTIONS_DEBUG 1
 #endif
-#ifndef OPTIONS_PRECISEMEMORY
-  #define OPTIONS_PRECISEMEMORY 1
-#endif
 
 #define CHECKE(value, expected) value
 #define COLOR(color, ...) __VA_ARGS__
@@ -23,7 +20,7 @@
 #define TIMER_STOP()
 #define TIMER(...)
 #define MEMORY(...)
-#define TIMERMEMORY
+#define TIMERMEMORY(...)
 #define TIMERSUM_SCOPED(...)
 #define TIMERSUM(...)
 #define TIMERSUM_GET(...) std::chrono::microseconds{0}
@@ -53,7 +50,7 @@
 
 #define TIMER_START(...) auto temporary_timer_1 = (                 \
   PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), \
-  PerfMonitor::TimeAndMemoryWatcher<true, false, false>())
+  PerfMonitor::TimeAndMemoryWatcher<true, false>())
 #define TIMER_STOP() temporary_timer_1.~TimeAndMemoryWatcher()
 
 /**
@@ -67,13 +64,13 @@
 */
 #define TIMER(...) if (auto indendent_info = (                     \
   PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), \
-  PerfMonitor::TimeAndMemoryWatcher<true, false, false>()) ){}else
+  PerfMonitor::TimeAndMemoryWatcher<true, false>()) ){}else
 #define MEMORY(...) if (auto indendent_info = (                    \
   PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), \
-  PerfMonitor::TimeAndMemoryWatcher<false, true, OPTIONS_PRECISEMEMORY>()) ){}else
+  PerfMonitor::TimeAndMemoryWatcher<false, true>()) ){}else
 #define TIMERMEMORY(...) if (auto indendent_info = (               \
   PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), \
-  PerfMonitor::TimeAndMemoryWatcher<true, true, OPTIONS_PRECISEMEMORY>()) ){}else
+  PerfMonitor::TimeAndMemoryWatcher<true, true>()) ){}else
 #endif
 
 // STATICCOUNTER
@@ -94,10 +91,11 @@
  * STATICCOUNTER("Name"); @endcode
  */
 #define STATICCOUNTER(...)                                                                       \
-  ([&](){                                                                                        \
+  if ([&](){                                                                                     \
     STRING_TO_CLASS(PM_ANONYMOUS_STRING("" ## __VA_ARGS__), string_in_class);                    \
     ASM_IncrementCounter(PerfMonitor::CounterInitialization<2, string_in_class>::id.GetOffset());\
-  })()
+    return false;                                                                                \
+    }()){}else
 
 #define STATICCOUNTER_GET(counter_name)                                                      \
   PerfMonitor::StaticCounter::GetTotalValue([&](){                                           \
@@ -120,18 +118,18 @@
 #undef TIMERSUM_GET
 #undef TIMERSUM_SET
 
-#define TIMERSUM_SCOPED(string)                                                      \
+#define TIMERSUM_SCOPED(...)                                                         \
 PerfMonitor::TimerSum temporary_timer_1([]() -> size_t {                             \
-  STRING_TO_CLASS(string, string_in_class);                                          \
+  STRING_TO_CLASS(PM_ANONYMOUS_STRING("" ## __VA_ARGS__), string_in_class);          \
   return PerfMonitor::CounterInitialization<0, string_in_class>::id.GetOffset();     \
 }())
 
 
-#define TIMERSUM(string)                                                             \
-if (auto indendent_info = std::move(PerfMonitor::TimerSum( []() -> size_t {          \
-  STRING_TO_CLASS(string, string_in_class);                                          \
+#define TIMERSUM(...)                                                                \
+if (auto indendent_info = PerfMonitor::TimerSum( []() -> size_t {                    \
+  STRING_TO_CLASS(PM_ANONYMOUS_STRING("" ## __VA_ARGS__), string_in_class);          \
   return PerfMonitor::CounterInitialization<0, string_in_class>::id.GetOffset();     \
-}() )) ){} else
+}() ) ){} else
 
 #define TIMERSUM_GET(counter_name)                                              \
 PerfMonitor::TimerSum::GetTotalValue([]() -> size_t {                           \
@@ -163,6 +161,7 @@ if (auto indendent_info = [&]()                                            \
   PerfMonitor::PrintIfArgsEmpty(true, __FILE__, __LINE__, __VA_ARGS__);    \
   return PerfMonitor::Indention::Indent();                                 \
   }()){}else                                                               
+
 #endif
 
 // _ASSERT

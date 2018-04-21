@@ -16,8 +16,6 @@ namespace PerfMonitor
 
   PERFMONITOR_API std::int64_t InitTimeCounter();
   PERFMONITOR_API std::int64_t FinalizeTimeCounter(std::int64_t);
-  PERFMONITOR_API std::uint64_t GetCurrentMemoryConsumption();
-  PERFMONITOR_API std::uint64_t GetPeakMemoryConsumption();
   PERFMONITOR_API void SetColor(Color i_color);
   PERFMONITOR_API double GetInvFrequency();
   }

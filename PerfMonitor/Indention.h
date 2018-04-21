@@ -15,8 +15,8 @@ namespace PerfMonitor
     PERFMONITOR_API void PushIndention(char i_symbol, internal::IObject*);
     PERFMONITOR_API void PopIndention();
 
-    std::shared_ptr<internal::IObject> GetIndentionsHolder();
-    std::shared_ptr<internal::IObject> GetStdStreamSwitcher();
+    std::unique_ptr<internal::IObject> GetIndentionsHolder();
+    std::unique_ptr<internal::IObject> GetStdStreamSwitcher();
 
     struct Indent : internal::non_copyable, internal::IObject, internal::convertable_to_bool_false
       {

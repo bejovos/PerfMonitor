@@ -11,6 +11,7 @@
 #include <thread>
 #include <mutex>
 #include <csignal>
+#include "TimeAndMemoryWatcher.h"
 
 struct CounterStorage : PerfMonitor::internal::IObject
   {
@@ -106,15 +107,17 @@ void SIGSEGHandler(int i_sig);
 
 struct CoutFinalizer : PerfMonitor::internal::IObject
   {
-    std::shared_ptr<PerfMonitor::internal::IObject> m_indentions_holder;
-    std::shared_ptr<PerfMonitor::internal::IObject> m_std_stream_switcher;
-    std::shared_ptr<PerfMonitor::internal::IObject> m_counter_storage;
+    std::unique_ptr<PerfMonitor::internal::IObject> m_indentions_holder;
+    std::unique_ptr<PerfMonitor::internal::IObject> m_std_stream_switcher;
+    std::unique_ptr<PerfMonitor::internal::IObject> m_counter_storage;
+    std::unique_ptr<PerfMonitor::internal::IObject> m_memory_watchers;
 
     CoutFinalizer()
       {
       m_indentions_holder = PerfMonitor::Indention::GetIndentionsHolder();
       m_std_stream_switcher = PerfMonitor::Indention::GetStdStreamSwitcher();
-      m_counter_storage = std::make_shared<CounterStorage>();
+      m_counter_storage = std::make_unique<CounterStorage>();
+      m_memory_watchers = PerfMonitor::GetMemoryWatchers();
       p_counter_storage = static_cast<CounterStorage*>(m_counter_storage.get());
       set_terminate(&TerminateHandler);
       signal(SIGSEGV, SIGSEGHandler);

@@ -16,9 +16,6 @@ struct IndentionsHolder : PerfMonitor::internal::IObject
     std::vector<std::pair<char, IObject*>> m_indentions;    
     ~IndentionsHolder() override
       {
-      if (is_valid == false)
-        return;
-      is_valid = false;
       if (!m_indentions.empty())
         {
         std::cout << PerfMonitor::Color::Red;
@@ -39,25 +36,20 @@ struct StdSteamSwitcher : PerfMonitor::internal::IObject
     ~StdSteamSwitcher() override;
   };
 
-std::shared_ptr<PerfMonitor::internal::IObject> p_indentions_holder;
-std::shared_ptr<PerfMonitor::internal::IObject> p_std_stream_switcher;
 bool tab_needed = true;
 bool end_needed = false;
-IndentionsHolder * p_indentions_holder_raw;
-StdSteamSwitcher * p_std_stream_switcher_raw;
+IndentionsHolder * p_indentions_holder_raw = nullptr;
+StdSteamSwitcher * p_std_stream_switcher_raw = nullptr;
 
 namespace PerfMonitor
   {
   namespace Indention
     {
-    std::shared_ptr<internal::IObject> GetIndentionsHolder()
+    std::unique_ptr<internal::IObject> GetIndentionsHolder()
       {
-      if (!p_indentions_holder)
-        {
-        p_indentions_holder = std::make_shared<IndentionsHolder>();
-        p_indentions_holder_raw = dynamic_cast<IndentionsHolder*>(p_indentions_holder.get());
-        }        
-      return p_indentions_holder;
+      auto result = std::make_unique<IndentionsHolder>();
+      p_indentions_holder_raw = result.get();
+      return std::move(result);
       }
 
     bool SetEndNeeded(const bool i_end_needed)
@@ -160,9 +152,6 @@ StdSteamSwitcher::StdSteamSwitcher()
 
 StdSteamSwitcher::~StdSteamSwitcher()
   {
-  if (is_valid == false)
-    return;
-  is_valid = false;
   std::cout.imbue(std::locale(std::locale::classic()));
   std::cerr.imbue(std::locale(std::locale::classic()));
   std::clog.imbue(std::locale(std::locale::classic()));
@@ -176,14 +165,11 @@ namespace PerfMonitor
   {
   namespace Indention
     {
-    std::shared_ptr<internal::IObject> GetStdStreamSwitcher()
+    std::unique_ptr<internal::IObject> GetStdStreamSwitcher()
       {
-      if (!p_std_stream_switcher)
-        {
-        p_std_stream_switcher = std::make_shared<StdSteamSwitcher>();
-        p_std_stream_switcher_raw = dynamic_cast<StdSteamSwitcher*>(p_std_stream_switcher.get());
-        }        
-      return p_std_stream_switcher;
+      auto result = std::make_unique<StdSteamSwitcher>();
+      p_std_stream_switcher_raw = result.get();
+      return std::move(result);
       }
     }
   }

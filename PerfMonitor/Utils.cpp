@@ -24,20 +24,6 @@ namespace PerfMonitor
     return li.QuadPart - counter;
     }
 
-  std::uint64_t GetCurrentMemoryConsumption()
-    {
-    PROCESS_MEMORY_COUNTERS pmc;
-    GetProcessMemoryInfo(::GetCurrentProcess(), &pmc, sizeof(pmc));
-    return pmc.WorkingSetSize;
-    }
-
-  std::uint64_t GetPeakMemoryConsumption()
-    {
-    PROCESS_MEMORY_COUNTERS pmc;
-    GetProcessMemoryInfo(::GetCurrentProcess(), &pmc, sizeof(pmc));
-    return pmc.PeakWorkingSetSize;    
-    }
-
   void SetColor(const Color i_color)
     {
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), static_cast<WORD>(i_color));
