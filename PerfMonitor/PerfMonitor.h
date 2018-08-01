@@ -16,6 +16,7 @@
 #define CHECKE(value, expected) value
 #define COLOR(color, ...) __VA_ARGS__
 #define INFO(...)
+#define INFO_SCOPED(...)
 #define TIMER_START(...)
 #define TIMER_STOP()
 #define TIMER(...)
@@ -151,6 +152,7 @@ PerfMonitor::TimerSum::SetTotalValue([]() -> size_t {                           
 #undef CHECKE
 #undef COLOR
 #undef INFO
+#undef INFO_SCOPED
 
 #define CHECKE(value, expected) PerfMonitor::CheckEqual(value, expected)
 #define COLOR(color, ...) PerfMonitor::MakeColoredValue(color, __VA_ARGS__)
@@ -161,6 +163,14 @@ if (auto indendent_info = [&]()                                            \
   PerfMonitor::PrintIfArgsEmpty(true, __FILE__, __LINE__, __VA_ARGS__);    \
   return PerfMonitor::Indention::Indent();                                 \
   }()){}else                                                               
+#define INFO_SCOPED(...)                                                   \
+auto temporary_indendent_info_1 = [&]()                                    \
+  {                                                                        \
+  using namespace PerfMonitor;                                             \
+  PerfMonitor::PrintIfArgsEmpty(true, __FILE__, __LINE__, __VA_ARGS__);    \
+  return PerfMonitor::Indention::Indent();                                 \
+  }();
+
 
 #endif
 

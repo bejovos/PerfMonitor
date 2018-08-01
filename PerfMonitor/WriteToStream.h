@@ -119,7 +119,7 @@ namespace PerfMonitor
     return stream;
     }
 
-  inline bool PrintIfArgsEmpty(bool, const char* i_file, const int i_line)
+  inline bool PrintIfArgsEmpty(const bool i_print_end, const char* i_file, const int i_line)
     {
     long i = static_cast<long>(strlen(i_file)) - 1;
     for (; i >= 0; --i)
@@ -130,7 +130,9 @@ namespace PerfMonitor
         }
     if (i == -1)
       std::cout << i_file;
-    std::cout << "(" << i_line << ")\n";
+    std::cout << "(" << i_line << ")";
+    if (i_print_end)
+      std::cout << "\n";
     SetColor(Color::LightGray);
     return true;
     }
