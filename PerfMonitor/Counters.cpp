@@ -1,23 +1,51 @@
 #include "Counters.h"
-#include "WriteToStream.h"
 #include "Indention.h"
-
-#include <vector>
-#include <deque>
-#include <map>
-#include <string>
-#include <utility>
-#include <iostream>
-#include <thread>
-#include <mutex>
-#include <csignal>
 #include "TimeAndMemoryWatcher.h"
+#include "WriteToStream.h"
+
+#include <csignal>
+#include <deque>
+#include <iostream>
+#include <map>
+#include <mutex>
+#include <queue>
+#include <string>
+#include <thread>
+#include <utility>
+#include <vector>
 
 struct CounterStorage : PerfMonitor::internal::IObject
   {
   std::map<std::pair<int, std::string>, size_t> m_all_counters;
   std::deque<std::vector<std::int64_t>> m_all_counters_raw;
   std::recursive_mutex m_mutex;
+
+  std::queue<std::vector<std::int64_t>> m_all_counters_raw_unused;
+
+  CounterStorage()
+    {
+    for (size_t i = 0; i < 32; ++i)
+      {
+      m_all_counters_raw_unused.emplace(1024, 0);
+      }
+    }
+
+  std::int64_t * PrepareNewCounterStorage()
+    {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    if (!m_all_counters_raw_unused.empty())
+      {
+      m_all_counters_raw.emplace_back(
+        std::move(m_all_counters_raw_unused.front()));
+      m_all_counters_raw_unused.pop();
+      }
+    else
+      {
+      m_all_counters_raw.emplace_back(1024, 0); // no more than 1024 counters
+      }
+
+    return m_all_counters_raw.back().data();
+    }
   };
 
 CounterStorage * p_counter_storage = nullptr;
@@ -166,11 +194,6 @@ extern "C"
   {
   std::int64_t* PrepareNewCounterStorage()
     {
-    std::lock_guard<std::recursive_mutex> lock(p_counter_storage->m_mutex);
-    p_counter_storage->m_all_counters_raw.emplace_back();
-    auto& storage = p_counter_storage->m_all_counters_raw.back();
-    storage.resize(1024, 0); // no more than 1024 counters
-    std::int64_t* result = storage.data();
-    return result;
+    return p_counter_storage->PrepareNewCounterStorage();
     }
   }
