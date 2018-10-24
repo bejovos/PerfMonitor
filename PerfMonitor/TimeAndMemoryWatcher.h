@@ -7,6 +7,7 @@
 #include "_API.h"
 
 #include <iostream>
+#include <chrono>
 
 namespace PerfMonitor
   {

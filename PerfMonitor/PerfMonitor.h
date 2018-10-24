@@ -29,6 +29,7 @@
 #define STATICCOUNTER(...)
 #define STATICCOUNTER_GET(...) size_t{0}
 #define STATICCOUNTER_SET(...)
+#define STATICCOUNTER_RESET(...)
 #define PASSERT(...) if(true){}else
 
 
@@ -49,8 +50,11 @@
 #undef MEMORY
 #undef TIMERMEMORY
 
-#define TIMER_START(...) auto temporary_timer_1 = (                 \
-  PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), \
+#define TIMER_START(...) auto temporary_timer_1 = (                       \
+  [&](){                                                                  \
+  using namespace PerfMonitor;                                            \
+  PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);  \
+  }(),                                                                    \
   PerfMonitor::TimeAndMemoryWatcher<true, false>())
 #define TIMER_STOP() temporary_timer_1.~TimeAndMemoryWatcher()
 
@@ -63,14 +67,23 @@
 *   DoSomething();
 *   } @endcode
 */
-#define TIMER(...) if (auto indendent_info = (                     \
-  PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), \
+#define TIMER(...) if (auto indendent_info = (                            \
+  [&](){                                                                  \
+  using namespace PerfMonitor;                                            \
+  PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);  \
+  }(),                                                                    \
   PerfMonitor::TimeAndMemoryWatcher<true, false>()) ){}else
-#define MEMORY(...) if (auto indendent_info = (                    \
-  PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), \
+#define MEMORY(...) if (auto indendent_info = (                           \
+  [&](){                                                                  \
+  using namespace PerfMonitor;                                            \
+  PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);  \
+  }(),                                                                    \
   PerfMonitor::TimeAndMemoryWatcher<false, true>()) ){}else
-#define TIMERMEMORY(...) if (auto indendent_info = (               \
-  PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), \
+#define TIMERMEMORY(...) if (auto indendent_info = (                      \
+  [&](){                                                                  \
+  using namespace PerfMonitor;                                            \
+  PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);  \
+  }(),                                                                    \
   PerfMonitor::TimeAndMemoryWatcher<true, true>()) ){}else
 #endif
 
@@ -79,6 +92,7 @@
 #undef STATICCOUNTER
 #undef STATICCOUNTER_GET
 #undef STATICCOUNTER_SET
+#undef STATICCOUNTER_RESET
 
 #define PM_CONCATENATE(x, y) x ## y
 #define PM_QUOTE(x) PM_QUOTE2(x)
@@ -109,6 +123,13 @@
     STRING_TO_CLASS(counter_name, string_in_class);                                          \
     return PerfMonitor::CounterInitialization<2, string_in_class>::id.GetId();               \
   }(), value)
+
+#define STATICCOUNTER_RESET(...)                          \
+  if ([&](){                                              \
+    INFO(__VA_ARGS__, STATICCOUNTER_GET(__VA_ARGS__));    \
+    STATICCOUNTER_SET(__VA_ARGS__, 0);                    \
+    return false;                                         \
+    }()){}else
 
 #endif
 
