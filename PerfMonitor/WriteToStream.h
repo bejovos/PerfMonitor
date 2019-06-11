@@ -8,8 +8,20 @@
 #include <string>
 #include <tuple>
 
-template <class type, size_t dim>
+template <class, size_t>
 class MMVector;
+
+namespace itk {
+template <typename, unsigned int>
+class Point;
+
+template <unsigned int>
+class Size;
+template <unsigned int>
+class Index;
+template <typename, unsigned int>
+class Vector;
+}
 
 namespace PerfMonitor
   {
@@ -23,6 +35,12 @@ namespace PerfMonitor
       : value(std::forward<T>(i_value))
       , color(i_color)
       {}
+    };
+
+  template <size_t DigitsAfterComma>
+  struct ProgressValue
+    {
+      size_t value;
     };
 
   template <class Stream>
@@ -110,6 +128,56 @@ namespace PerfMonitor
     stream << point[dim - 1];
     stream.flags(flags);
     stream.precision(precision);
+    return stream;
+    }
+
+  template <class Stream, class Type, size_t dim>
+  Stream& operator <<(Stream& stream, const itk::Point<Type, dim>& point)
+    {
+    auto precision = stream.precision();
+    auto flags = stream.flags();
+    stream << std::fixed << std::setprecision(2);
+    for (size_t i=0; i<dim - 1; ++i)
+      stream << point[i] << " ";
+    stream << point[dim - 1];
+    stream.flags(flags);
+    stream.precision(precision);
+    return stream;
+    }
+
+  template <class Stream, size_t Value>
+  Stream& operator <<(Stream& stream, const ProgressValue<Value>& value)
+    {
+    auto precision = stream.precision();
+    auto flags = stream.flags();
+    stream << std::fixed << std::setprecision(Value);
+    stream << value.value * std::pow(10, - int(Value)) << " %";
+    stream.flags(flags);
+    stream.precision(precision);
+    return stream;
+    }
+
+  template <class Stream, size_t dim>
+  Stream& operator <<(Stream& stream, const itk::Size<dim>& point)
+    {
+    for (size_t i=0; i<dim; ++i)
+      stream << point[i] << " ";
+    return stream;
+    }
+
+  template <class Stream, size_t dim>
+  Stream& operator <<(Stream& stream, const itk::Index<dim>& point)
+    {
+    for (size_t i=0; i<dim; ++i)
+      stream << point[i] << " ";
+    return stream;
+    }
+
+  template <class Stream, class T, size_t dim>
+  Stream& operator <<(Stream& stream, const itk::Vector<T, dim>& point)
+    {
+    for (size_t i=0; i<dim; ++i)
+      stream << point[i] << " ";
     return stream;
     }
 

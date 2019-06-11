@@ -1,10 +1,10 @@
-#pragma once
+//#pragma once // intentially missing guard
 
 #ifndef OPTIONS_INFO
   #define OPTIONS_INFO 1
 #endif
-#ifndef OPTIONS_WATCHERS
-  #define OPTIONS_WATCHERS 1
+#ifndef OPTIONS_TIMERMEMORY
+  #define OPTIONS_TIMERMEMORY 1
 #endif
 #ifndef OPTIONS_COUNTERS
   #define OPTIONS_COUNTERS 1
@@ -13,12 +13,33 @@
   #define OPTIONS_DEBUG 1
 #endif
 
-#define CHECKE(value, expected) value
+#undef COLOR
+#undef INFO
+#undef INFO_SCOPED
+#undef TIMER_START
+#undef TIMER_STOP
+#undef TIMERMEMORY_START
+#undef TIMERMEMORY_STOP
+#undef TIMER
+#undef MEMORY
+#undef TIMERMEMORY
+#undef TIMERSUM_SCOPED
+#undef TIMERSUM
+#undef TIMERSUM_GET
+#undef TIMERSUM_SET
+#undef STATICCOUNTER
+#undef STATICCOUNTER_GET
+#undef STATICCOUNTER_SET
+#undef STATICCOUNTER_RESET
+#undef PASSERT
+
 #define COLOR(color, ...) __VA_ARGS__
 #define INFO(...)
 #define INFO_SCOPED(...)
 #define TIMER_START(...)
 #define TIMER_STOP()
+#define TIMERMEMORY_START(...)
+#define TIMERMEMORY_STOP()
 #define TIMER(...)
 #define MEMORY(...)
 #define TIMERMEMORY(...)
@@ -43,13 +64,22 @@
 #include "TimeAndMemoryWatcher.h"
 
 // TIMER
-#if OPTIONS_WATCHERS
+#if OPTIONS_TIMERMEMORY
+#undef TIMERMEMORY_START
 #undef TIMER_START
 #undef TIMER_STOP
+#undef TIMERMEMORY_STOP
 #undef TIMER
 #undef MEMORY
 #undef TIMERMEMORY
 
+
+#define TIMERMEMORY_START(...) auto temporary_timer_1 = (                 \
+  [&](){                                                                  \
+  using namespace PerfMonitor;                                            \
+  PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);  \
+  }(),                                                                    \
+  PerfMonitor::TimeAndMemoryWatcher<true, true>())
 #define TIMER_START(...) auto temporary_timer_1 = (                       \
   [&](){                                                                  \
   using namespace PerfMonitor;                                            \
@@ -57,6 +87,7 @@
   }(),                                                                    \
   PerfMonitor::TimeAndMemoryWatcher<true, false>())
 #define TIMER_STOP() temporary_timer_1.~TimeAndMemoryWatcher()
+#define TIMERMEMORY_STOP() temporary_timer_1.~TimeAndMemoryWatcher()
 
 /**
 * @brief Timer. Prints elapsed time to cout in its destructor. Nested scope is indented.
@@ -90,6 +121,7 @@
 // STATICCOUNTER
 #if OPTIONS_COUNTERS
 #undef STATICCOUNTER
+#undef STATICCOUNTER_ADD
 #undef STATICCOUNTER_GET
 #undef STATICCOUNTER_SET
 #undef STATICCOUNTER_RESET
@@ -111,19 +143,31 @@
     ASM_IncrementCounter(PerfMonitor::CounterInitialization<2, string_in_class>::id.GetOffset());\
     return false;                                                                                \
     }()){}else
-
+/**
+ * @brief Thread-safe static counter. Each call adds given number to the internal counter.
+ * Usage examples:
+ * @code
+ * STATICCOUNTER_ADD("Name", 1); @endcode
+ */
+#define STATICCOUNTER_ADD(counter_name, value)                                                   \
+  if ([&](){                                                                                     \
+    STRING_TO_CLASS(PM_ANONYMOUS_STRING("" ## counter_name), string_in_class);                   \
+    ASM_IncrementCounter2(PerfMonitor::CounterInitialization<2, string_in_class>::id.GetOffset(), value);\
+    return false;                                                                                \
+    }()){}else
+// Not thread-safe
 #define STATICCOUNTER_GET(counter_name)                                                      \
   PerfMonitor::StaticCounter::GetTotalValue([&](){                                           \
     STRING_TO_CLASS(counter_name, string_in_class);                                          \
     return PerfMonitor::CounterInitialization<2, string_in_class>::id.GetId();               \
   }())
-
+// Not thread-safe
 #define STATICCOUNTER_SET(counter_name, value)                                               \
   PerfMonitor::StaticCounter::SetTotalValue([&](){                                           \
     STRING_TO_CLASS(counter_name, string_in_class);                                          \
     return PerfMonitor::CounterInitialization<2, string_in_class>::id.GetId();               \
   }(), value)
-
+// Not thread-safe
 #define STATICCOUNTER_RESET(...)                          \
   if ([&](){                                              \
     INFO(__VA_ARGS__, STATICCOUNTER_GET(__VA_ARGS__));    \
@@ -134,9 +178,9 @@
 #endif
 
 // TIMERSUM
-#if OPTIONS_WATCHERS && OPTIONS_COUNTERS
-#undef TIMERSUM
+#if OPTIONS_TIMERMEMORY && OPTIONS_COUNTERS
 #undef TIMERSUM_SCOPED
+#undef TIMERSUM
 #undef TIMERSUM_GET
 #undef TIMERSUM_SET
 
@@ -165,17 +209,14 @@ PerfMonitor::TimerSum::SetTotalValue([]() -> size_t {                           
   return PerfMonitor::CounterInitialization<0, string_in_class>::id.GetId();    \
 }(), microseconds)
 
-
 #endif 
 
 // CHECKE INFO
 #if OPTIONS_INFO
-#undef CHECKE
 #undef COLOR
 #undef INFO
 #undef INFO_SCOPED
 
-#define CHECKE(value, expected) PerfMonitor::CheckEqual(value, expected)
 #define COLOR(color, ...) PerfMonitor::MakeColoredValue(color, __VA_ARGS__)
 #define INFO(...)                                                          \
 if (auto indendent_info = [&]()                                            \
@@ -191,7 +232,6 @@ auto temporary_indendent_info_1 = [&]()                                    \
   PerfMonitor::PrintIfArgsEmpty(true, __FILE__, __LINE__, __VA_ARGS__);    \
   return PerfMonitor::Indention::Indent();                                 \
   }();
-
 
 #endif
 
@@ -216,6 +256,3 @@ auto temporary_indendent_info_1 = [&]()                                    \
 */
 #define PBREAK(...) PASSERT(!(__VA_ARGS__))
 
-//#pragma warning (disable:4189)
-//#pragma warning (disable: 4390)
-#pragma warning (disable:4100) // unreferenced formal parameter
