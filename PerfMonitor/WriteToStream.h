@@ -79,6 +79,7 @@ namespace PerfMonitor
   template <class Stream, class... Args>
   Stream& operator <<(Stream& stream, const std::tuple<Args...>& i_tuple)
     {
+    stream << std::boolalpha;
     PrintTuple<std::tuple<Args...>, Stream, sizeof...(Args) - 1>::Print(stream, i_tuple);
     return stream;
     }

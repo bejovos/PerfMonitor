@@ -121,30 +121,46 @@ namespace PerfMonitor
   PERFMONITOR_API std::int64_t GetTotalCounterValue(size_t i_id);
   // not thread safe
   PERFMONITOR_API void SetTotalCounterValue(size_t i_id, std::int64_t i_value);
+  // not thread safe, called during application exit
+  PERFMONITOR_API void PrintAllCounters();
 
-  struct CounterId
-    {
-      explicit CounterId(const int i_category, const char* i_name)
-        : m_offset(RegisterCounter(i_category, i_name) * 8) // multiply by 8 to transform counter into offset
-        {
-        }
-
-      size_t GetId() const { return m_offset / 8; }
-
-      size_t GetOffset() const { return m_offset; }
-
-    private:
-      const size_t m_offset;
-    };
-
-  template <int Category, class TString>
+  template <int Category, class... TStrings>
   struct CounterInitialization
     {
+    struct CounterId
+      {
+        template <size_t Index = 0>
+        static void FillIndex(std::array<size_t, sizeof...(TStrings)>& o_result, std::integral_constant<size_t, Index> = {})
+          {
+          std::tuple<TStrings...> t;
+          o_result[Index] = RegisterCounter(Category, std::get<Index>(t).MakeString().c_str()) * 8; // multiply by 8 to transform counter into offset
+          FillIndex(o_result, std::integral_constant<size_t, Index + 1>{});
+          }
+        static void FillIndex(std::array<size_t, sizeof...(TStrings)>&, std::integral_constant<size_t, sizeof...(TStrings)>) {}
+
+        explicit CounterId()
+          : m_offset([&]()
+            {
+            std::array<size_t, sizeof...(TStrings)> result;
+            FillIndex(result, std::integral_constant<size_t, 0>{});
+            return result;
+            }())
+          {
+          }
+
+        size_t GetId(size_t index = 0) const { return m_offset[index] / 8; }
+
+        size_t GetOffset(size_t index = 0) const { return m_offset[index]; }
+
+      private:
+        const std::array<size_t, sizeof...(TStrings)> m_offset;
+      };
       static const CounterId id;
     };
 
-  template <int Category, class TString>
-  const CounterId CounterInitialization<Category, TString>::id(Category, TString::MakeString().c_str());
+  template <int Category, class... TStrings>
+  const typename CounterInitialization<Category, TStrings...>::CounterId 
+    CounterInitialization<Category, TStrings...>::id;
 
   namespace StaticCounter
     {

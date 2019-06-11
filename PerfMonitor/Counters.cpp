@@ -83,6 +83,7 @@ namespace PerfMonitor
 
   void PrintAllCounters()
     {
+    std::lock_guard<std::recursive_mutex> lock(p_counter_storage->m_mutex);
     if (p_counter_storage->m_all_counters_raw.empty() || p_counter_storage->m_all_counters.empty())
       return;
     const std::vector<std::int64_t> all_counters = CombineAllCounters();
