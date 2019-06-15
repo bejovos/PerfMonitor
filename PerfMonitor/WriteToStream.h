@@ -183,8 +183,7 @@ namespace PerfMonitor
 
   inline std::wostream& operator <<(std::wostream& stream, const std::string& i_string)
     {
-    std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
-    stream << converter.from_bytes(i_string);
+    stream << std::wstring{i_string.begin(), i_string.end()};
     return stream;
     }
 

@@ -27,7 +27,7 @@ namespace PerfMonitor
 
     struct convertable_to_bool_false
       {
-      operator bool() const
+      constexpr operator bool() const
         {
         return false;
         }

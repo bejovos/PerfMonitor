@@ -8,6 +8,8 @@
 
 #include <iostream>
 #include <chrono>
+#include <memory>
+#include <utility>
 
 namespace PerfMonitor
   {
@@ -18,29 +20,12 @@ namespace PerfMonitor
 
   std::unique_ptr<internal::IObject> GetMemoryWatchers();
 
-
   template <bool WatchTime, bool WatchMemory>
   struct TimeAndMemoryWatcher : internal::non_copyable, internal::IObject, internal::convertable_to_bool_false
     {
-      TimeAndMemoryWatcher()
+      TimeAndMemoryWatcher(nullptr_t)
         {
         Indention::PushIndention(char(179), this);
-        InitCounter();
-        Indention::SetEndNeeded(true);
-        }
-
-      TimeAndMemoryWatcher(TimeAndMemoryWatcher&& i_watcher) noexcept
-        {
-        assert(i_watcher.is_valid);
-        i_watcher.is_valid = false;
-        Indention::PopIndention();
-        Indention::PushIndention(char(179), this);
-        m_time_counter = i_watcher.m_time_counter;
-        m_stamp_index = i_watcher.m_stamp_index;
-        }
-
-      void InitCounter()
-        {
         if (WatchMemory)
           {          
           auto start = MakeStartingMemoryStamp();          
@@ -49,13 +34,48 @@ namespace PerfMonitor
           }
         if (WatchTime)
           m_time_counter = InitTimeCounter();
+        is_valid = true;
+        Indention::SetEndNeeded(true);
+        }
+      
+      TimeAndMemoryWatcher()
+        {
+        is_valid = false;
+        }
+
+      TimeAndMemoryWatcher(TimeAndMemoryWatcher&& i_watcher) noexcept
+        {
+        is_valid = i_watcher.is_valid;
+        if (i_watcher.is_valid)
+          {
+          i_watcher.is_valid = false;
+          Indention::PopIndention();
+          Indention::PushIndention(char(179), this);
+          m_time_counter = i_watcher.m_time_counter;
+          m_stamp_index = i_watcher.m_stamp_index;
+          }
+        }
+
+      TimeAndMemoryWatcher& operator = (TimeAndMemoryWatcher&& i_watcher) noexcept
+        {
+        if (i_watcher.is_valid == false && this->is_valid == true)
+          {
+          Finalize();
+          this->is_valid = false;
+          return *this;
+          }
+        assert(false);
+        return *this;
         }
 
       ~TimeAndMemoryWatcher() override
         {
-        if (is_valid == false)
-          return;
-        is_valid = false;
+        if (is_valid)
+          Finalize();
+        }
+
+      void Finalize()
+        {
         if (WatchTime)
           m_time_counter = FinalizeTimeCounter(m_time_counter);
         bool start_from_whitespace = Indention::SetEndNeeded(false);
