@@ -16,6 +16,9 @@
     <ClCompile Include="TimeAndMemoryWatcher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Callbacks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BreakInDestructor.h">
@@ -46,6 +49,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="TimeAndMemoryWatcher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Callbacks.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

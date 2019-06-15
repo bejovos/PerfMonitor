@@ -62,6 +62,7 @@
 #include "Indention.h"
 #include "Counters.h"
 #include "TimeAndMemoryWatcher.h"
+#include "Callbacks.h"
 
 // TIMER
 #if OPTIONS_TIMERMEMORY
