@@ -11,6 +11,8 @@
 #include <memory>
 #include <utility>
 
+#pragma warning(disable:5030) // attribute is not recognized
+
 namespace PerfMonitor
   {
   // first - stamp index, second - memory in bytes
@@ -20,8 +22,9 @@ namespace PerfMonitor
 
   std::unique_ptr<internal::IObject> GetMemoryWatchers();
 
+  
   template <bool WatchTime, bool WatchMemory>
-  struct TimeAndMemoryWatcher : internal::non_copyable, internal::IObject, internal::convertable_to_bool_false
+  struct [[rscpp::guard]] TimeAndMemoryWatcher : internal::non_copyable, internal::IObject, internal::convertable_to_bool_false
     {
       TimeAndMemoryWatcher(nullptr_t)
         {

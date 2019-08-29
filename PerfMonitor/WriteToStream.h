@@ -37,6 +37,12 @@ namespace PerfMonitor
       {}
     };
 
+  template <class T>
+  ColoredValue<T> MakeColoredValue(T&& i_value, const Color i_color)
+    {
+    return ColoredValue<T>{std::forward<T>(i_value), i_color};
+    }
+
   template <size_t DigitsAfterComma>
   struct ProgressValue
     {
@@ -160,7 +166,7 @@ namespace PerfMonitor
   template <class Stream, size_t dim>
   Stream& operator <<(Stream& stream, const itk::Size<dim>& point)
     {
-    for (size_t i=0; i<dim; ++i)
+    for (unsigned int i=0; i<dim; ++i)
       stream << point[i] << " ";
     return stream;
     }
