@@ -16,10 +16,8 @@
 #undef COLOR
 #undef INFO
 #undef INFO_SCOPED
-#undef TIMER_START
-#undef TIMER_STOP
-#undef TIMERMEMORY_START
-#undef TIMERMEMORY_STOP
+#undef TIMER_OBJ
+#undef TIMERMEMORY_OBJ
 #undef TIMER
 #undef MEMORY
 #undef TIMERMEMORY
@@ -112,11 +110,10 @@
 #undef STATICCOUNTER_SET
 #undef STATICCOUNTER_RESET
 
-#define PM_CONCATENATE(x, y) x ## y
-#define PM_QUOTE(x) PM_QUOTE2(x)
-#define PM_QUOTE2(x) # x
-#define PM_FILE_LINE PM_CONCATENATE(__FILE__, ":") ## PM_QUOTE(__LINE__)
-#define PM_ANONYMOUS_STRING(string) ((PerfMonitor::internal::c_strlen(string) == 0) ? PM_FILE_LINE : string)
+#define PM_MAKE_STRING_IN_CLASS(string, class_name)                                                                                  \
+  STRING_TO_CLASS((PerfMonitor::internal::strlen(string) == 0) ? __FUNCSIG__ : string "::<", class_name ## _impl2);                  \
+  using class_name = PerfMonitor::internal::BackwardTrim<class_name ## _impl2, PerfMonitor::internal::String<':', ':', '<'>>::type
+
 /**
  * @brief Thread-safe static counter. By default each call adds 1 to the internal counter.
  * Usage examples:
@@ -125,7 +122,7 @@
  */
 #define STATICCOUNTER(...)                                                                       \
   if ([&](){                                                                                     \
-    STRING_TO_CLASS(PM_ANONYMOUS_STRING("" ## __VA_ARGS__), string_in_class);                    \
+    PM_MAKE_STRING_IN_CLASS("" ## __VA_ARGS__, string_in_class);                                 \
     ASM_IncrementCounter(PerfMonitor::CounterInitialization<2, string_in_class>::id.GetOffset());\
     return false;                                                                                \
     }()){}else
@@ -137,20 +134,20 @@
  */
 #define STATICCOUNTER_ADD(counter_name, value)                                                   \
   if ([&](){                                                                                     \
-    STRING_TO_CLASS(PM_ANONYMOUS_STRING("" ## counter_name), string_in_class);                   \
+    PM_MAKE_STRING_IN_CLASS("" ## counter_name, string_in_class);                                \
     ASM_IncrementCounter2(PerfMonitor::CounterInitialization<2, string_in_class>::id.GetOffset(), value);\
     return false;                                                                                \
     }()){}else
 // Not thread-safe
 #define STATICCOUNTER_GET(counter_name)                                                      \
   PerfMonitor::StaticCounter::GetTotalValue([&](){                                           \
-    STRING_TO_CLASS(counter_name, string_in_class);                                          \
+    PM_MAKE_STRING_IN_CLASS(counter_name, string_in_class);                                          \
     return PerfMonitor::CounterInitialization<2, string_in_class>::id.GetId();               \
   }())
 // Not thread-safe
 #define STATICCOUNTER_SET(counter_name, value)                                               \
   PerfMonitor::StaticCounter::SetTotalValue([&](){                                           \
-    STRING_TO_CLASS(counter_name, string_in_class);                                          \
+    PM_MAKE_STRING_IN_CLASS(counter_name, string_in_class);                                          \
     return PerfMonitor::CounterInitialization<2, string_in_class>::id.GetId();               \
   }(), value)
 // Not thread-safe
@@ -172,26 +169,26 @@
 
 #define TIMERSUM_SCOPED(...)                                                         \
 PerfMonitor::TimerSum temporary_timer_1([]() -> size_t {                             \
-  STRING_TO_CLASS(PM_ANONYMOUS_STRING("" ## __VA_ARGS__), string_in_class);          \
+  PM_MAKE_STRING_IN_CLASS("" ## __VA_ARGS__, string_in_class);          \
   return PerfMonitor::CounterInitialization<0, string_in_class>::id.GetOffset();     \
 }())
 
 
 #define TIMERSUM(...)                                                                \
 if (auto indendent_info = PerfMonitor::TimerSum( []() -> size_t {                    \
-  STRING_TO_CLASS(PM_ANONYMOUS_STRING("" ## __VA_ARGS__), string_in_class);          \
+  PM_MAKE_STRING_IN_CLASS("" ## __VA_ARGS__, string_in_class);          \
   return PerfMonitor::CounterInitialization<0, string_in_class>::id.GetOffset();     \
 }() ) ){} else
 // Not thread-safe
 #define TIMERSUM_GET(counter_name)                                              \
 PerfMonitor::TimerSum::GetTotalValue([]() -> size_t {                           \
-  STRING_TO_CLASS(counter_name, string_in_class);                               \
+  PM_MAKE_STRING_IN_CLASS(counter_name, string_in_class);                               \
   return PerfMonitor::CounterInitialization<0, string_in_class>::id.GetId();    \
 }())
 // Not thread-safe
 #define TIMERSUM_SET(counter_name, microseconds)                                \
 PerfMonitor::TimerSum::SetTotalValue([]() -> size_t {                           \
-  STRING_TO_CLASS(counter_name, string_in_class);                               \
+  PM_MAKE_STRING_IN_CLASS(counter_name, string_in_class);                               \
   return PerfMonitor::CounterInitialization<0, string_in_class>::id.GetId();    \
 }(), microseconds)
 // Not thread-safe
