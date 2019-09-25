@@ -1,5 +1,2 @@
 LIBRARY
 EXPORTS
-ASM_IncrementCounter
-ASM_IncrementCounter2
-ASM_Break

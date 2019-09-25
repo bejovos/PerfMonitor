@@ -13,121 +13,149 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include <set>
+#include <atomic>
 
-struct CounterStorage : PerfMonitor::internal::IObject
+struct CounterStorage
   {
-  std::map<std::pair<int, std::string>, size_t> m_all_counters;
-  std::deque<std::vector<std::int64_t>> m_all_counters_raw;
-  std::recursive_mutex m_mutex;
+    explicit CounterStorage(const char* ip_name)
+      : name(ip_name) {}
 
-  std::queue<std::vector<std::int64_t>> m_all_counters_raw_unused;
-
-  CounterStorage()
-    {
-    for (size_t i = 0; i < 32; ++i)
-      {
-      m_all_counters_raw_unused.emplace(1024, 0);
-      }
-    }
-
-  std::int64_t * PrepareNewCounterStorage()
-    {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
-    if (!m_all_counters_raw_unused.empty())
-      {
-      m_all_counters_raw.emplace_back(
-        std::move(m_all_counters_raw_unused.front()));
-      m_all_counters_raw_unused.pop();
-      }
-    else
-      {
-      m_all_counters_raw.emplace_back(1024, 0); // no more than 1024 counters
-      }
-
-    return m_all_counters_raw.back().data();
-    }
+    size_t data{0};
+    std::vector<size_t*> clients;
+    std::string name;
   };
 
-CounterStorage * p_counter_storage = nullptr;
+struct CountersStorage : PerfMonitor::internal::IObject
+  {
+  std::vector<CounterStorage> counters;
+  std::map<std::string, size_t> name_w_ids;
+
+  std::recursive_mutex mutex;
+  };
+
+CountersStorage * p_counter_storage = nullptr;
+std::atomic<size_t> thread_counter = 0;
+std::atomic<bool> is_thread_count_tracking_enabled = true; 
+
+struct ThreadCounter
+  {
+    ThreadCounter()
+      {
+      ++thread_counter;
+      }
+  };
+
+static thread_local ThreadCounter thread_initialization;
 
 namespace PerfMonitor
   {
-  std::vector<std::int64_t> CombineAllCounters()
+  void CombineAllCounters()
     {
-    const size_t num_counters = p_counter_storage->m_all_counters.size();
-    std::vector<std::int64_t> result(num_counters, 0);
-    for (const auto& ar : p_counter_storage->m_all_counters_raw)
+    for (auto& counter : p_counter_storage->counters)
       {
-      for (size_t i = 0; i < num_counters; ++i)
-        result[i] += ar[i];
+      for (size_t* client : counter.clients)
+        {
+        counter.data += *client;
+        *client = 0;
+        }
       }
-    return result;
     }
 
-  std::int64_t GetTotalCounterValue(const size_t i_id)
-    {
-    std::lock_guard<std::recursive_mutex> lock(p_counter_storage->m_mutex);
-    std::int64_t result = 0;
-    for (const auto& ar : p_counter_storage->m_all_counters_raw)
-      result += ar[i_id];
-    return result;
-    }
+  // std::int64_t GetTotalCounterValue(const size_t i_id)
+  //   {
+  //   std::lock_guard<std::recursive_mutex> lock(p_counter_storage->m_mutex);
+  //   std::int64_t result = 0;
+  //   for (const auto& ar : p_counter_storage->m_all_counters_raw)
+  //     result += ar[i_id];
+  //   return result;
+  //   }
 
-  void SetTotalCounterValue(size_t i_id, std::int64_t i_value)
+  // void SetTotalCounterValue(size_t i_id, std::int64_t i_value)
+  //   {
+  //   std::lock_guard<std::recursive_mutex> lock(p_counter_storage->m_mutex);
+  //   for (auto& ar : p_counter_storage->m_all_counters_raw)
+  //     ar[i_id] = 0;
+  //   p_counter_storage->m_all_counters_raw.front()[i_id] = i_value;
+  //   }
+
+  void DisableThreadCountTracking()
     {
-    std::lock_guard<std::recursive_mutex> lock(p_counter_storage->m_mutex);
-    for (auto& ar : p_counter_storage->m_all_counters_raw)
-      ar[i_id] = 0;
-    p_counter_storage->m_all_counters_raw.front()[i_id] = i_value;
+    is_thread_count_tracking_enabled = false;
     }
 
   void PrintAllCounters()
     {
-    std::lock_guard<std::recursive_mutex> lock(p_counter_storage->m_mutex);
-    if (p_counter_storage->m_all_counters_raw.empty() || p_counter_storage->m_all_counters.empty())
+    std::lock_guard<std::recursive_mutex> lock(p_counter_storage->mutex);
+
+    if (is_thread_count_tracking_enabled == false && p_counter_storage->counters.empty())
       return;
-    const std::vector<std::int64_t> all_counters = CombineAllCounters();
+
     std::wcout << L"\n";
-    if (p_counter_storage->m_all_counters_raw.size() != std::thread::hardware_concurrency())
-      std::wcout << L"Num storages: " << p_counter_storage->m_all_counters_raw.size() << L"\n";
-    int previous_category = -1;
-    for (const auto& v : p_counter_storage->m_all_counters)
+    if (is_thread_count_tracking_enabled)
+      std::wcout << L"Num threads: " << thread_counter << L"\n";
+
+    if (p_counter_storage->counters.empty())
+      return;
+    CombineAllCounters();
+
+    std::vector<std::reference_wrapper<CounterStorage>> counters{p_counter_storage->counters.begin(), p_counter_storage->counters.end()};
+    std::sort(counters.begin(), counters.end(), 
+      [&](const std::reference_wrapper<CounterStorage> left, const std::reference_wrapper<CounterStorage> right)
       {
-      if (v.first.first != previous_category)
+      return left.get().name < right.get().name;
+      });
+
+    char previous_category = 0;
+    for (const auto& counter : counters)
+      {
+      if (counter.get().name[0] != previous_category)
         {
-        previous_category = v.first.first;
-        if (previous_category == 0)
+        previous_category = counter.get().name[0];
+        if (previous_category == 'T')
           std::wcout << L"[TIMERSUM]\n";
-        if (previous_category == 1)
-          std::wcout << L"[MEMORY]\n";
-        if (previous_category == 2)
+        if (previous_category == 'C')
           std::wcout << L"[STATISTIC]\n";
         }
-      const std::int64_t value = all_counters[v.second];
-      if (previous_category == 0)
-        std::wcout << L"  " << v.first.second << L" time: " << std::chrono::microseconds(static_cast<long long>(value * GetInvFrequency())) << L"\n";
-      if (previous_category == 1)
-        std::wcout << L"  " << v.first.second << L" memory: " << MemoryRecord { static_cast<std::uint64_t>(value) } << L"\n";
-      if (previous_category == 2)
-        std::wcout << L"  " << v.first.second << L": " << NumericRecord { value } << L"\n";
+      const std::int64_t value = counter.get().data;
+      if (previous_category == 'T')
+        std::wcout << L"  " << counter.get().name.c_str() + 1 << L" time: " << std::chrono::microseconds(static_cast<long long>(value * GetInvFrequency())) << L"\n";
+      if (previous_category == 'C')
+        std::wcout << L"  " << counter.get().name.c_str() + 1 << L": " << NumericRecord { value } << L"\n";
       }
     }
 
-  size_t RegisterCounter(int i_category, const char* i_name)
+  void CounterUtils::RegisterCounter(const char* ip_name, size_t* ip_client)
     {
-    std::lock_guard<std::recursive_mutex> lock(p_counter_storage->m_mutex);
-    const auto it = p_counter_storage->m_all_counters.find({ i_category, i_name });
-    size_t index;
-    if (it == p_counter_storage->m_all_counters.end())
+    std::lock_guard<std::recursive_mutex> lock(p_counter_storage->mutex);
+    auto it = p_counter_storage->name_w_ids.find(ip_name);
+    if (it == p_counter_storage->name_w_ids.end())
       {
-      index = p_counter_storage->m_all_counters.size();
-      p_counter_storage->m_all_counters.emplace(std::make_pair(
-        std::make_pair(i_category, i_name),
-        index));
+      const size_t id = p_counter_storage->counters.size();
+      p_counter_storage->counters.emplace_back(ip_name);
+      p_counter_storage->counters.back().clients.emplace_back(ip_client);
+      p_counter_storage->name_w_ids[ip_name] = id;
       }
     else
-      index = it->second;
-    return index;
+      {
+      p_counter_storage->counters[it->second].clients.emplace_back(ip_client);
+      }
+    }
+
+  void CounterUtils::UnRegisterCounter(size_t* ip_client)
+    {
+    std::lock_guard<std::recursive_mutex> lock(p_counter_storage->mutex);
+    for (auto& counter : p_counter_storage->counters)
+      {
+      for (size_t* client : counter.clients)
+        if (client == ip_client)
+          {
+          counter.data += *client;
+          auto& clients = counter.clients;
+          clients.erase(std::remove(clients.begin(), clients.end(), ip_client), clients.end());
+          return;
+          }
+      }
     }
   }
 
@@ -145,9 +173,9 @@ struct CoutFinalizer : PerfMonitor::internal::IObject
       {
       m_indentions_holder = PerfMonitor::Indention::GetIndentionsHolder();
       m_std_stream_switcher = PerfMonitor::Indention::GetStdStreamSwitcher();
-      m_counter_storage = std::make_unique<CounterStorage>();
+      m_counter_storage = std::make_unique<CountersStorage>();
       m_memory_watchers = PerfMonitor::GetMemoryWatchers();
-      p_counter_storage = static_cast<CounterStorage*>(m_counter_storage.get());
+      p_counter_storage = static_cast<CountersStorage*>(m_counter_storage.get());
       set_terminate(&TerminateHandler);
       signal(SIGSEGV, SIGSEGHandler);
       }
@@ -189,12 +217,4 @@ void TerminateHandler()
     }
   std::cout << PerfMonitor::Color::LightGray;
   g_finalizer.~CoutFinalizer();
-  }
-
-extern "C" 
-  {
-  std::int64_t* PrepareNewCounterStorage()
-    {
-    return p_counter_storage->PrepareNewCounterStorage();
-    }
   }

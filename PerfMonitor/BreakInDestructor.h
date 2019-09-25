@@ -2,11 +2,6 @@
 
 #include "_API.h"
 
-extern "C"
-  {
-  PERFMONITOR_API void ASM_Break();
-  }
-
 namespace PerfMonitor
   {
   struct BreakInDestructor
@@ -24,7 +19,7 @@ namespace PerfMonitor
     ~BreakInDestructor()
       {
       if (m_value == false && m_break == true)
-        ASM_Break();
+        __debugbreak();
       }
 
     operator bool() const

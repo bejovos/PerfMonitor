@@ -3,6 +3,7 @@
 #include "_API.h"
 #include "IObject.h"
 #include "Utils.h"
+#include "StringToClass.h"
 
 #include <cstdint>
 #include <sstream>
@@ -107,111 +108,73 @@ namespace PerfMonitor
     }
   }
 
-// Static counters, TimerSum
-extern "C" {
-PERFMONITOR_API void ASM_IncrementCounter(size_t i_id);
-PERFMONITOR_API void ASM_IncrementCounter2(size_t i_id, std::int64_t i_value);
-}
-
 namespace PerfMonitor
   {
-  PERFMONITOR_API size_t RegisterCounter(int i_category, const char* i_name);
-
-  // not thread safe
-  PERFMONITOR_API std::int64_t GetTotalCounterValue(size_t i_id);
-  // not thread safe
-  PERFMONITOR_API void SetTotalCounterValue(size_t i_id, std::int64_t i_value);
-  // not thread safe, called during application exit
-  PERFMONITOR_API void PrintAllCounters();
-
-  template <int Category, class... TStrings>
-  struct CounterInitialization
+  PERFMONITOR_API void DisableThreadCountTracking();
+  namespace CounterUtils
     {
-    struct CounterId
-      {
-        template <size_t Index = 0>
-        static void FillIndex(std::array<size_t, sizeof...(TStrings)>& o_result, std::integral_constant<size_t, Index> = {})
-          {
-          std::tuple<TStrings...> t;
-          o_result[Index] = RegisterCounter(Category, std::get<Index>(t).MakeString().c_str()) * 8; // multiply by 8 to transform counter into offset
-          FillIndex(o_result, std::integral_constant<size_t, Index + 1>{});
-          }
-        static void FillIndex(std::array<size_t, sizeof...(TStrings)>&, std::integral_constant<size_t, sizeof...(TStrings)>) {}
+    // if name starts from 'T' - Time counter, 'C' - Regular counter
+    PERFMONITOR_API void RegisterCounter(const char* ip_name, size_t* ip_client);
+    PERFMONITOR_API void UnRegisterCounter(size_t* ip_client);
 
-        explicit CounterId()
-          : m_offset([&]()
-            {
-            std::array<size_t, sizeof...(TStrings)> result;
-            FillIndex(result, std::integral_constant<size_t, 0>{});
-            return result;
-            }())
-          {
-          }
-
-        size_t GetId(size_t index = 0) const { return m_offset[index] / 8; }
-
-        size_t GetOffset(size_t index = 0) const { return m_offset[index]; }
-
-      private:
-        const std::array<size_t, sizeof...(TStrings)> m_offset;
-      };
-      static const CounterId id;
-    };
-
-  template <int Category, class... TStrings>
-  const typename CounterInitialization<Category, TStrings...>::CounterId 
-    CounterInitialization<Category, TStrings...>::id;
-
-  namespace StaticCounter
-    {
-    static size_t GetTotalValue(const size_t i_id)
-      {
-      return GetTotalCounterValue(i_id);
-      }
-
-    static void SetTotalValue(const size_t i_id, size_t i_value)
-      {
-      return SetTotalCounterValue(i_id, i_value);
-      }
+    // not thread safe, called during application exit
+    PERFMONITOR_API void PrintAllCounters();
+    // not thread safe
+    // PERFMONITOR_API size_t GetTotalValue(size_t i_id);
+    // not thread safe
+    // PERFMONITOR_API void SetTotalValue(size_t i_id, size_t i_value);
     }
 
-  struct TimerSum : internal::non_copyable, internal::convertable_to_bool_false
+  template <class String>
+  struct Counter
     {
-      explicit TimerSum(const size_t i_offset)
-        : m_value(InitTimeCounter())
-        , m_offset(i_offset)
-        {
-        }
+    struct Storage
+      {
+        explicit Storage()
+          {
+          CounterUtils::RegisterCounter(String::Str(), &data); 
+          }
+        ~Storage()
+          {
+          CounterUtils::UnRegisterCounter(&data);
+          }
 
-      TimerSum(TimerSum&& i_object) noexcept
-        : m_value(i_object.m_value)
-        , m_offset(i_object.m_offset)
-        {
-        assert(i_object.is_valid);
-        i_object.is_valid = false;
-        }
+        void Increment(const size_t i_value)
+          {
+          data += i_value;
+          }
 
+      private:
+        size_t data{0};
+      };
+      static thread_local Storage storage; 
+    };
+
+  template <class String>
+  thread_local typename Counter<String>::Storage Counter<String>::storage;
+
+  template <class String>
+  struct TimerSum;
+  template <char... Chars>
+  struct TimerSum<String<Chars...>> : internal::non_copyable, internal::non_moveable, internal::convertable_to_bool_false
+    {
       ~TimerSum()
         {
-        if (is_valid == false)
-          return;
-        is_valid = true;
-        m_value = FinalizeTimeCounter(m_value);
-        ASM_IncrementCounter2(m_offset, m_value);
+        Counter<String<'T', Chars...>>::storage.Increment(FinalizeTimeCounter(m_value));
         }
 
-      static std::chrono::microseconds GetTotalValue(const size_t i_id)
-        {
-        return std::chrono::microseconds(static_cast<long long>(GetTotalCounterValue(i_id) * GetInvFrequency()));
-        }
-
-      static void SetTotalValue(const size_t i_id, std::chrono::microseconds i_value)
-        {
-        return SetTotalCounterValue(i_id, static_cast<std::int64_t>(i_value.count() / GetInvFrequency()));
-        }
-
-      std::int64_t m_value;
-      const size_t m_offset;
-      bool is_valid = true;
+      const std::int64_t m_value = InitTimeCounter();
     };
+
+  template <class String>
+  struct StaticCounter;
+  template <char... Chars>
+  struct StaticCounter<String<Chars...>> : internal::non_copyable, internal::non_moveable, internal::convertable_to_bool_false
+    {
+      StaticCounter()
+        {
+        Counter<String<'C', Chars...>>::storage.Increment(1);
+        }
+    }; 
+
   }

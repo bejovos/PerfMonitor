@@ -1,5 +1,7 @@
 #pragma once
 
+#include <exception>
+
 namespace PerfMonitor
   {
   namespace internal
@@ -31,6 +33,15 @@ namespace PerfMonitor
         {
         return false;
         }
+      };
+
+    struct convertible_to_any
+      {
+        template <class T>
+        operator T()
+          {
+          std::terminate();
+          }
       };
     }
   }

@@ -47,6 +47,10 @@ namespace PerfMonitor
   struct ProgressValue
     {
       size_t value;
+      double GetIn01Range() const
+        {
+        return value * 1. / std::pow(10, 2 + int(DigitsAfterComma));
+        }
     };
 
   template <class Stream>
