@@ -1,4 +1,5 @@
 //#pragma once // intentially missing guard
+// ReSharper disable IdentifierTypo
 
 #ifndef OPTIONS_INFO
   #define OPTIONS_INFO 1
@@ -16,10 +17,11 @@
 #undef COLOR
 #undef INFO
 #undef INFO_SCOPED
-#undef TIMER_OBJ
-#undef TIMERMEMORY_OBJ
 #undef TIMER
 #undef TIMERMEMORY
+#undef TIMER_INIT
+#undef TIMERMEMORY_INIT
+#undef TIMERMEMORY_SCOPED
 #undef TIMERSUM_SCOPED
 #undef TIMERSUM
 #undef TIMERSUM_GET
@@ -33,10 +35,11 @@
 #define COLOR(color, ...) __VA_ARGS__
 #define INFO(...)
 #define INFO_SCOPED(...)
-#define TIMER_OBJ(...) 0
-#define TIMERMEMORY_OBJ(...) 0
 #define TIMER(...)
 #define TIMERMEMORY(...)
+#define TIMER_INIT(...)
+#define TIMERMEMORY_INIT(...)
+#define TIMERMEMORY_SCOPED(...)
 #define TIMERSUM_SCOPED(...)
 #define TIMERSUM(...)
 #define TIMERSUM_GET(...) std::chrono::microseconds{0}
@@ -58,57 +61,6 @@
 #include "TimeAndMemoryWatcher.h"
 #include "Callbacks.h"
 
-// TIMER
-#if OPTIONS_TIMERMEMORY
-#undef TIMER_OBJ
-#undef TIMERMEMORY_OBJ
-#undef TIMER
-#undef TIMERMEMORY
-
-// #define TIMER_OBJ(...) (                                                  \
-//   [&](){                                                                  \
-//   using namespace PerfMonitor;                                            \
-//   PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);  \
-//   }(),                                                                    \
-//   PerfMonitor::TimeAndMemoryWatcher<true, false>(nullptr))
-// #define TIMERMEMORY_OBJ(...) (                                            \
-//   [&](){                                                                  \
-//   using namespace PerfMonitor;                                            \
-//   PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);  \
-//   }(),                                                                    \
-//   PerfMonitor::TimeAndMemoryWatcher<true, true>(nullptr))
-
-/**
-* @brief Timer. Prints elapsed time to cout in its destructor. Nested scope is indented.
-* Usage examples:
-* @code
-* TIMER("Calculation")
-*   {
-*   DoSomething();
-*   } @endcode
-*/
-#define TIMER(...) if (PerfMonitor::TimeAndMemoryWatcher<true, false> indendent_info = (\
-  [&](){                                                                                \
-  using namespace PerfMonitor;                                                          \
-  PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                \
-  }(),                                                                                  \
-  nullptr) ){}else
-#define TIMERMEMORY(...) if (PerfMonitor::TimeAndMemoryWatcher<true, true> indendent_info = ( \
-  [&](){                                                                                      \
-  using namespace PerfMonitor;                                                                \
-  PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                      \
-  }(),                                                                                        \
-  nullptr) ){}else
-#endif
-
-// STATICCOUNTER
-#if OPTIONS_COUNTERS
-#undef STATICCOUNTER
-#undef STATICCOUNTER_ADD
-#undef STATICCOUNTER_GET
-#undef STATICCOUNTER_SET
-#undef STATICCOUNTER_RESET
-
 #define PM_STRING_TO_CLASS(string, class_name)                                                    \
   struct class_name {                                                                             \
     static constexpr const char* Str() {                                                          \
@@ -120,15 +72,72 @@
     return temporary{};                                                                           \
     }()
 
+// TIMER
+#if OPTIONS_TIMERMEMORY
+#undef TIMER
+#undef TIMERMEMORY
+#undef TIMER_INIT
+#undef TIMERMEMORY_INIT
+#undef TIMERMEMORY_SCOPED
+
+/**
+* @brief Timer. Prints elapsed time to cout in its destructor. Nested scope is indented.
+* Usage examples:
+* @code
+* TIMER("Calculation")
+*   {
+*   DoSomething();
+*   } @endcode
+*/
+#define TIMER(...) \
+  if (const auto&& indention_info = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, false>>((  \
+    [&](){                                                                                                                    \
+    using namespace PerfMonitor;                                                                                              \
+    PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                                                    \
+    }(), nullptr))                                                                                                            \
+    ){}else                    
+
+#define TIMERMEMORY(...) \
+  if (const auto&& indention_info = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, true>>((   \
+    [&](){                                                                                                                    \
+    using namespace PerfMonitor;                                                                                              \
+    PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                                                    \
+    }(), nullptr))                                                                                                            \
+    ){}else                    
+
+#define TIMER_INIT(...) \
+  (PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), PerfMonitor::TimeAndMemoryWatcher<true, false>()) ? \
+    PerfMonitor::internal::convertible_to_any{} :                                                                             \
+
+#define TIMERMEMORY_INIT(...) \
+  (PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), PerfMonitor::TimeAndMemoryWatcher<true, true>()) ?  \
+    PerfMonitor::internal::convertible_to_any{} :                                                                             \
+
+#define TIMERMEMORY_SCOPED(...) \
+  const auto&& indention_info = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, true>>((       \
+    [&](){                                                                                                                    \
+    using namespace PerfMonitor;                                                                                              \
+    PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                                                    \
+    }(), nullptr))                                                                                                            
+
+#endif
+
+// STATICCOUNTER
+#if OPTIONS_COUNTERS
+#undef STATICCOUNTER
+#undef STATICCOUNTER_ADD
+#undef STATICCOUNTER_GET
+#undef STATICCOUNTER_SET
+#undef STATICCOUNTER_RESET
+
 #define STATICCOUNTER(...)                                                                        \
   if (const auto& indention_info = PerfMonitor::internal::MakeFromFancyString<PerfMonitor::StaticCounter>(PM_STRING_TO_LAMBDA("" ## __VA_ARGS__))) {}else
 
-// #define STATICCOUNTER_ADD(counter_name, value)                                                   \
-//   if ([&](){                                                                                     \
-//     PM_MAKE_STRING_IN_CLASS("" ## counter_name, string_in_class);                                \
-//     ASM_IncrementCounter2(PerfMonitor::CounterInitialization<2, string_in_class>::id.GetOffset(), value);\
-//     return false;                                                                                \
-//     }()){}else
+#define STATICCOUNTER_ADD(counter_name, value)                                                   \
+  if ([&](){                                                                                     \
+    PerfMonitor::internal::MakeFromFancyString<PerfMonitor::StaticCounter>(PM_STRING_TO_LAMBDA("" ## counter_name), value); \
+    return false;                                                                                \
+    }()){}else
 // Not thread-safe
 // #define STATICCOUNTER_GET(counter_name)                                                      \
 //   PerfMonitor::StaticCounter::GetTotalValue([&](){                                           \
@@ -230,3 +239,4 @@ PerfMonitor::Indention::Indent temporary_indendent_info_1 = ([&]()         \
 */
 #define PBREAK(...) PASSERT(!(__VA_ARGS__))
 
+// ReSharper restore IdentifierTypo

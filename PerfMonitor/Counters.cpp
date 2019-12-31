@@ -164,15 +164,13 @@ void SIGSEGHandler(int i_sig);
 
 struct CoutFinalizer : PerfMonitor::internal::IObject
   {
-    std::unique_ptr<PerfMonitor::internal::IObject> m_indentions_holder;
-    std::unique_ptr<PerfMonitor::internal::IObject> m_std_stream_switcher;
-    std::unique_ptr<PerfMonitor::internal::IObject> m_counter_storage;
-    std::unique_ptr<PerfMonitor::internal::IObject> m_memory_watchers;
+    std::unique_ptr<IObject> m_indentions_holder;
+    std::unique_ptr<IObject> m_counter_storage;
+    std::unique_ptr<IObject> m_memory_watchers;
 
     CoutFinalizer()
       {
-      m_indentions_holder = PerfMonitor::Indention::GetIndentionsHolder();
-      m_std_stream_switcher = PerfMonitor::Indention::GetStdStreamSwitcher();
+      m_indentions_holder = PerfMonitor::Indention::Initialize();
       m_counter_storage = std::make_unique<CountersStorage>();
       m_memory_watchers = PerfMonitor::GetMemoryWatchers();
       p_counter_storage = static_cast<CountersStorage*>(m_counter_storage.get());
@@ -182,13 +180,9 @@ struct CoutFinalizer : PerfMonitor::internal::IObject
 
     ~CoutFinalizer()
       {
-      if (is_valid == false)
-        return;
-      is_valid = false;
       // Not a very elegant solution but during application termination this is the only thing we can do
-      m_indentions_holder.get()->~IObject();
+      PerfMonitor::Indention::ForceClear();
       PerfMonitor::PrintAllCounters();
-      m_std_stream_switcher.get()->~IObject();
       }
   };
 

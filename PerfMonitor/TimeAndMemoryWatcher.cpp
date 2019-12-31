@@ -59,8 +59,9 @@ namespace PerfMonitor
 
   MemoryConsumption GetMemoryConsumption()
     {
-    PROCESS_MEMORY_COUNTERS pmc;
-    GetProcessMemoryInfo(::GetCurrentProcess(), &pmc, sizeof(pmc));
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    pmc.cb = sizeof(pmc);
+    GetProcessMemoryInfo(::GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&pmc), pmc.cb);
     return {std::max(pmc.PeakWorkingSetSize, pmc.WorkingSetSize), pmc.WorkingSetSize};
     }
 

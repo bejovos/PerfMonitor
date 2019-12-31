@@ -9,8 +9,6 @@ namespace PerfMonitor
     struct IObject
       {
         virtual ~IObject() = default;
-      protected:
-        bool is_valid = true;
       };    
 
     struct non_copyable

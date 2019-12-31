@@ -127,15 +127,15 @@ namespace PerfMonitor
     return stream;
     }
 
-  template <class Stream, class Type, size_t dim>
-  Stream& operator <<(Stream& stream, const MMVector<Type, dim>& point)
+  template <class Stream, class Type, typename std::enable_if<Type::dimension == 3>::type* = nullptr>
+  Stream& operator <<(Stream& stream, const Type& point)
     {
     auto precision = stream.precision();
     auto flags = stream.flags();
     stream << std::fixed << std::setprecision(2);
-    for (size_t i=0; i<dim - 1; ++i)
+    for (size_t i=0; i<Type::dimension - 1; ++i)
       stream << point[i] << " ";
-    stream << point[dim - 1];
+    stream << point[Type::dimension - 1];
     stream.flags(flags);
     stream.precision(precision);
     return stream;
@@ -208,7 +208,7 @@ namespace PerfMonitor
         }
     if (i == -1)
       std::cout << i_file;
-    std::cout << "(" << i_line << ")";
+    std::cout << ":" << i_line;
     if (i_print_end)
       std::cout << "\n";
     SetColor(Color::LightGray);

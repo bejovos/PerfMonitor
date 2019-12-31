@@ -93,11 +93,18 @@ namespace PerfMonitor
         using type = typename StringToClassImpl<String, make_index_sequence<left + prefix_length, right - left - prefix_length>>::type;
       };
 
-    template <template <class> class Result, class Str>
-    Result<typename FancyString<Str, String<'c', 'd', 'e', 'c', 'l', ' '>, String<':',':','<'>>::type> MakeFromFancyString(const Str&)
+    template <template <class> class Result, class Str, class... Args>
+    Result<typename FancyString<Str, String<'c', 'd', 'e', 'c', 'l', ' '>, String<':',':','<'>>::type> MakeFromFancyString(const Str&, Args&&... i_args)
+      {
+      return {std::forward<Args>(i_args)...};
+      }
+
+    template <class Result>
+    Result MakeFromNothing(std::nullptr_t)
       {
       return {};
       }
+
     }
   }
 

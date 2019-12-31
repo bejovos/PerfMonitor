@@ -1,23 +1,35 @@
 #pragma once
 
-#include "_API.h"
-#include "IObject.h"
-#include "Utils.h"
-#include "StringToClass.h"
-
 #include <cstdint>
+#include <ostream>
 #include <sstream>
 #include <cassert>
 #include <iostream>
 #include <iomanip>
 #include <chrono>
 
+#include "_API.h"
+#include "IObject.h"
+#include "Utils.h"
+#include "StringToClass.h"
+
 // Records
 namespace PerfMonitor
   {
   struct MemoryRecord
     {
-      std::uint64_t counter;
+      std::int64_t counter;
+      bool print_sign;
+      template <class T, typename std::enable_if<std::is_signed<T>::value>::type* = nullptr>
+      explicit MemoryRecord(const T& value)
+        : counter(value), print_sign(true)
+        {
+        }
+      template <class T, typename std::enable_if<std::is_unsigned<T>::value>::type* = nullptr>
+      explicit MemoryRecord(const T& value)
+         : counter(value), print_sign(false)
+         {
+         }
     };
 
   struct NumericRecord
@@ -61,6 +73,17 @@ namespace PerfMonitor
     auto flags = stream.flags();
     stream << std::fixed;
     SetColor(Color::Yellow);
+    if (record.print_sign)
+      {
+      if (memory >= 0)
+        stream << '+';
+      else
+        {
+        stream << '-';
+        memory = - memory;
+        }
+      }
+    
     if (memory < 1000)
       stream << std::setprecision(0) << round(memory) << " b";
     else if (memory < 1. * 1024 * 10)
@@ -90,7 +113,7 @@ namespace PerfMonitor
   template <class Stream>
   Stream& operator <<(Stream& stream, const NumericRecord& record)
     {
-    std::ostringstream buf;
+    std::stringstream buf;
     buf << record.counter;
     const std::string s = buf.str();
     const int l = static_cast<int>(s.size());
@@ -101,11 +124,12 @@ namespace PerfMonitor
       stream << s[i];
     for (int j = 0; j < v; ++j)
       {
-      stream << " " << s[i] << s[i + 1] << s[i + 2];
+      stream << "\'" << s[i] << s[i + 1] << s[i + 2];
       i += 3;
       }
     return stream;
     }
+
   }
 
 namespace PerfMonitor
@@ -117,13 +141,13 @@ namespace PerfMonitor
     PERFMONITOR_API void RegisterCounter(const char* ip_name, size_t* ip_client);
     PERFMONITOR_API void UnRegisterCounter(size_t* ip_client);
 
-    // not thread safe, called during application exit
-    PERFMONITOR_API void PrintAllCounters();
     // not thread safe
     // PERFMONITOR_API size_t GetTotalValue(size_t i_id);
     // not thread safe
     // PERFMONITOR_API void SetTotalValue(size_t i_id, size_t i_value);
     }
+  // not thread safe, called during application exit
+  PERFMONITOR_API void PrintAllCounters();
 
   template <class String>
   struct Counter
@@ -171,9 +195,9 @@ namespace PerfMonitor
   template <char... Chars>
   struct StaticCounter<String<Chars...>> : internal::non_copyable, internal::non_moveable, internal::convertable_to_bool_false
     {
-      StaticCounter()
+      StaticCounter(const size_t value = 1)
         {
-        Counter<String<'C', Chars...>>::storage.Increment(1);
+        Counter<String<'C', Chars...>>::storage.Increment(value);
         }
     }; 
 

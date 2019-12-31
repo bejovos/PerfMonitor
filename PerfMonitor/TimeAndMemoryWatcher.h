@@ -24,60 +24,24 @@ namespace PerfMonitor
 
   
   template <bool WatchTime, bool WatchMemory>
-  struct [[rscpp::guard]] TimeAndMemoryWatcher : internal::non_copyable, internal::IObject, internal::convertable_to_bool_false
+  struct [[rscpp::guard]] TimeAndMemoryWatcher final : internal::non_copyable, internal::non_moveable, internal::IObject, internal::convertable_to_bool_false
     {
-      TimeAndMemoryWatcher(nullptr_t)
+      TimeAndMemoryWatcher()
         {
-        Indention::PushIndention(char(179), this);
+        // Indention::PushIndention(char(179), this);
+        Indention::PushIndention('|', this);
         if (WatchMemory)
           {          
           auto start = MakeStartingMemoryStamp();          
-          std::wcout << "(" << MemoryRecord { start.second } << ")";
+          // std::wcout << "(" << MemoryRecord { start.second } << ")";
           m_stamp_index = start.first;
           }
         if (WatchTime)
           m_time_counter = InitTimeCounter();
-        is_valid = true;
         Indention::SetEndNeeded(true);
         }
       
-      TimeAndMemoryWatcher()
-        {
-        is_valid = false;
-        }
-
-      TimeAndMemoryWatcher(TimeAndMemoryWatcher&& i_watcher) noexcept
-        {
-        is_valid = i_watcher.is_valid;
-        if (i_watcher.is_valid)
-          {
-          i_watcher.is_valid = false;
-          Indention::PopIndention();
-          Indention::PushIndention(char(179), this);
-          m_time_counter = i_watcher.m_time_counter;
-          m_stamp_index = i_watcher.m_stamp_index;
-          }
-        }
-
-      TimeAndMemoryWatcher& operator = (TimeAndMemoryWatcher&& i_watcher) noexcept
-        {
-        if (i_watcher.is_valid == false && this->is_valid == true)
-          {
-          Finalize();
-          this->is_valid = false;
-          return *this;
-          }
-        assert(false);
-        return *this;
-        }
-
       ~TimeAndMemoryWatcher() override
-        {
-        if (is_valid)
-          Finalize();
-        }
-
-      void Finalize()
         {
         if (WatchTime)
           m_time_counter = FinalizeTimeCounter(m_time_counter);
@@ -93,14 +57,8 @@ namespace PerfMonitor
           {
           const std::pair<std::uint64_t, std::int64_t> end = MakeEndingMemoryStamp(m_stamp_index);
 
-          std::wcout << (start_from_whitespace ? L" " : L"");
-          if (end.second > 0)
-            std::wcout << L"memory: +" << MemoryRecord { static_cast<std::uint64_t>(end.second) };
-          else
-            std::wcout << L"memory: -" << MemoryRecord { static_cast<std::uint64_t>(-end.second) };
-
-          std::wcout << L" peak: ";
-          std::wcout << MemoryRecord { end.first };
+          std::wcout << (start_from_whitespace ? L" " : L"") << L"memory: " << MemoryRecord{end.second};
+          std::wcout << L" peak: " << MemoryRecord { end.first };
           }
         std::wcout << L"\n";
         }

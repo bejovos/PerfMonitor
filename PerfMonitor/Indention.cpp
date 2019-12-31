@@ -8,48 +8,51 @@
 #include <utility>
 #include <vector>
 #include <xlocbuf>
+#include <windows.h>
 
 // ReSharper disable CppInconsistentNaming
+using namespace PerfMonitor::Indention;
 
-struct IndentionsHolder : PerfMonitor::internal::IObject
+namespace
   {
+  struct Data : PerfMonitor::internal::IObject
+    {
     std::vector<std::pair<char, IObject*>> m_indentions;    
-    ~IndentionsHolder() override
-      {
-      if (!m_indentions.empty())
-        {
-        std::cout << PerfMonitor::Color::Red;
-        std::cout << "  [Execution aborted]\n";
-        std::cout << PerfMonitor::Color::LightGray;       
-        }
-
-      // Not a very elegant solution but during application termination this is the only thing we can do
-      while (!m_indentions.empty())
-        m_indentions.back().second->~IObject();
-      }
-  };
-
-struct StdSteamSwitcher : PerfMonitor::internal::IObject
-  {
     std::deque<char> m_unprinted_chars;
-    StdSteamSwitcher();
-    ~StdSteamSwitcher() override;
-  };
-
-bool tab_needed = true;
-bool end_needed = false;
-IndentionsHolder * p_indentions_holder_raw = nullptr;
-StdSteamSwitcher * p_std_stream_switcher_raw = nullptr;
+    Data();
+    ~Data();
+    };
+  
+  Data* g_data = nullptr;
+  bool tab_needed = true;
+  bool end_needed = false;
+  }
 
 namespace PerfMonitor
   {
   namespace Indention
     {
-    std::unique_ptr<internal::IObject> GetIndentionsHolder()
+    std::unique_ptr<internal::IObject> Indention::Initialize()
       {
-      auto result = std::make_unique<IndentionsHolder>();
-      p_indentions_holder_raw = result.get();
-      return std::move(result);
+      if (g_data != nullptr)
+        throw std::logic_error("Not possible to initialize indentations twice");
+      auto data = std::make_unique<Data>();
+      g_data = data.get();
+      return data;
+      }
+
+    void ForceClear()
+      {
+      if (!g_data->m_indentions.empty())
+        {
+        std::cout << PerfMonitor::Color::Red;
+        std::cout << "  [Execution aborted]\n";
+        std::cout << PerfMonitor::Color::LightGray;
+        }
+
+      // Not a very elegant solution but during application termination this is the only thing we can do
+      while (!g_data->m_indentions.empty())
+        g_data->m_indentions.back().second->~IObject();
       }
 
     bool SetEndNeeded(const bool i_end_needed)
@@ -61,12 +64,12 @@ namespace PerfMonitor
 
     void PushIndention(const char i_symbol, internal::IObject* ip_object)
       {
-      p_indentions_holder_raw->m_indentions.emplace_back(i_symbol, ip_object);
+      g_data->m_indentions.emplace_back(i_symbol, ip_object);
       }
 
     void PopIndention()
       {
-      p_indentions_holder_raw->m_indentions.pop_back();
+      g_data->m_indentions.pop_back();
       }
 
     template <class Char>
@@ -102,23 +105,23 @@ namespace PerfMonitor
             if (end_needed)
               {
               end_needed = false;
-              p_std_stream_switcher_raw->m_unprinted_chars.push_back('\n');
+              g_data->m_unprinted_chars.push_back('\n');
               tab_needed = true;
               }
             if (tab_needed)
               {
               tab_needed = false;
-              for (auto& ind : p_indentions_holder_raw->m_indentions)
-                p_std_stream_switcher_raw->m_unprinted_chars.emplace_back(ind.first);
+              for (auto& ind : g_data->m_indentions)
+                g_data->m_unprinted_chars.emplace_back(ind.first);
               }
-            p_std_stream_switcher_raw->m_unprinted_chars.push_back(static_cast<char>(*rStart));
+            g_data->m_unprinted_chars.push_back(static_cast<char>(*rStart));
             if (*rStart == '\n' || *rStart == '\r')
               tab_needed = true;
             }
 
-          for (; !p_std_stream_switcher_raw->m_unprinted_chars.empty() && wStart < wEnd; 
-            ++wStart, p_std_stream_switcher_raw->m_unprinted_chars.pop_front())
-            *wStart = p_std_stream_switcher_raw->m_unprinted_chars.front();
+          for (; !g_data->m_unprinted_chars.empty() && wStart < wEnd; 
+            ++wStart, g_data->m_unprinted_chars.pop_front())
+            *wStart = g_data->m_unprinted_chars.front();
 
           if (wStart != wEnd)
             res = std::codecvt_base::partial;
@@ -138,9 +141,8 @@ namespace PerfMonitor
     }
   }
 
-StdSteamSwitcher::StdSteamSwitcher()
+Data::Data()
   {
-  using namespace PerfMonitor::Indention;
   std::cout.imbue(std::locale(std::locale::classic(), new IndentFacet<char>()));
   std::cerr.imbue(std::locale(std::locale::classic(), new IndentFacet<char>()));
   std::clog.imbue(std::locale(std::locale::classic(), new IndentFacet<char>()));
@@ -150,7 +152,7 @@ StdSteamSwitcher::StdSteamSwitcher()
   std::wclog.imbue(std::locale(std::locale::classic(), new IndentFacet<wchar_t>()));
   }
 
-StdSteamSwitcher::~StdSteamSwitcher()
+Data::~Data()
   {
   std::cout.imbue(std::locale(std::locale::classic()));
   std::cerr.imbue(std::locale(std::locale::classic()));
@@ -159,17 +161,8 @@ StdSteamSwitcher::~StdSteamSwitcher()
   std::wcout.imbue(std::locale(std::locale::classic()));
   std::wcerr.imbue(std::locale(std::locale::classic()));
   std::wclog.imbue(std::locale(std::locale::classic()));
-  }
 
-namespace PerfMonitor
-  {
-  namespace Indention
-    {
-    std::unique_ptr<internal::IObject> GetStdStreamSwitcher()
-      {
-      auto result = std::make_unique<StdSteamSwitcher>();
-      p_std_stream_switcher_raw = result.get();
-      return std::move(result);
-      }
-    }
+  ForceClear();
+
+  g_data = nullptr;
   }
