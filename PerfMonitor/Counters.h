@@ -32,9 +32,10 @@ namespace PerfMonitor
          }
     };
 
+  template <class T>
   struct NumericRecord
     {
-      std::int64_t counter;
+      T counter;
     };
 
   template <class Stream>
@@ -110,8 +111,8 @@ namespace PerfMonitor
     return stream;
     }
 
-  template <class Stream>
-  Stream& operator <<(Stream& stream, const NumericRecord& record)
+  template <class Stream, class T>
+  Stream& operator <<(Stream& stream, const NumericRecord<T>& record)
     {
     std::stringstream buf;
     buf << record.counter;

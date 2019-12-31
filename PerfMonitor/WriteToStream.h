@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Utils.h"
+#include "counters.h"
 
 #include <codecvt>
 #include <iomanip>
@@ -83,6 +84,26 @@ namespace PerfMonitor
     return ColoredValue<std::tuple<Args...>>(std::forward_as_tuple(i_values...), i_color);
     }
 
+  template <class Stream, class T, class = void*>
+  struct PrintTupleValue
+    {
+    static void Print(Stream& stream, const T& i_value)
+      {
+      stream << i_value;
+      }
+    };
+
+  template <class Stream, class T>
+  struct PrintTupleValue<Stream, T, typename std::enable_if<
+    std::is_integral<typename std::decay<T>::type>::value
+    && std::is_same<typename std::decay<T>::type, bool>::value == false>::type*>
+    {
+    static void Print(Stream& stream, const T& i_value)
+      {
+      stream << NumericRecord<T>{i_value};
+      }
+    };
+
   template <class Tuple, class Stream, size_t index>
   struct PrintTuple
     {
@@ -91,7 +112,7 @@ namespace PerfMonitor
       PrintTuple<Tuple, Stream, index - 1>::Print(stream, i_tuple);
       if (std::is_same<typename std::decay<typename std::tuple_element<index - 1,Tuple>::type>::type, Color>::value == false)
         stream << " ";
-      stream << std::get<index>(i_tuple);
+      PrintTupleValue<Stream, decltype(std::get<index>(i_tuple))>::Print(stream, std::get<index>(i_tuple));
       }
     };
 
@@ -100,7 +121,7 @@ namespace PerfMonitor
     {
     static void Print(Stream& stream, const Tuple& i_tuple)
       {
-      stream << std::get<0>(i_tuple);
+      PrintTupleValue<Stream, decltype(std::get<0>(i_tuple))>::Print(stream, std::get<0>(i_tuple));
       }
     };
 
@@ -223,5 +244,24 @@ namespace PerfMonitor
       std::wcout << L"\n";
     SetColor(Color::LightGray);
     return true;
+    }
+
+  template <class T>
+  struct QuotedValue
+    {
+    const T value;
+    };
+
+  template <class T>
+  QuotedValue<T> MakeQuotedValue(T&& i_value)
+    {
+    return QuotedValue<T>{std::forward<T>(i_value)};
+    }
+
+  template <class T, class Stream>
+  Stream& operator <<(Stream& stream, const QuotedValue<T>& i_value)
+    {
+    stream << "\"" << i_value.value << "\"";
+    return stream;
     }
   }

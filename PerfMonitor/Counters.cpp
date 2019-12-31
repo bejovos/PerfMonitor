@@ -121,7 +121,7 @@ namespace PerfMonitor
       if (previous_category == 'T')
         std::wcout << L"  " << counter.get().name.c_str() + 1 << L" time: " << std::chrono::microseconds(static_cast<long long>(value * GetInvFrequency())) << L"\n";
       if (previous_category == 'C')
-        std::wcout << L"  " << counter.get().name.c_str() + 1 << L": " << NumericRecord { value } << L"\n";
+        std::wcout << L"  " << counter.get().name.c_str() + 1 << L": " << NumericRecord<std::int64_t> { value } << L"\n";
       }
     }
 
