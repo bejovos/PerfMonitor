@@ -14,6 +14,7 @@ namespace PerfMonitor
     PERFMONITOR_API bool SetEndNeeded(bool i_end_needed);
     PERFMONITOR_API void PushIndention(char i_symbol, internal::IObject*);
     PERFMONITOR_API void PopIndention();
+    PERFMONITOR_API char GetLastChar();
     PERFMONITOR_API void SetProgressMessage(const char* ip_string);
 
     std::unique_ptr<internal::IObject> Initialize();

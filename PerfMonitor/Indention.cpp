@@ -72,6 +72,13 @@ namespace PerfMonitor
       g_data->m_indentions.pop_back();
       }
 
+    char GetLastChar()
+      {
+      if (g_data->m_indentions.empty())
+        return ' ';
+      return g_data->m_indentions.back().first;
+      }
+
     template <class Char>
     class IndentFacet : public std::codecvt<Char, char, std::mbstate_t>
       {

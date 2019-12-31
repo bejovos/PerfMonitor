@@ -28,8 +28,11 @@ namespace PerfMonitor
     {
       TimeAndMemoryWatcher()
         {
-        // Indention::PushIndention(char(179), this);
-        Indention::PushIndention('|', this);
+        if (Indention::GetLastChar() == ' ')
+          Indention::PushIndention('|', this);
+        else 
+          Indention::PushIndention(' ', this);
+
         if (WatchMemory)
           {          
           auto start = MakeStartingMemoryStamp();          
