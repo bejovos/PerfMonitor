@@ -9,9 +9,6 @@
 #include <string>
 #include <tuple>
 
-template <class, size_t>
-class MMVector;
-
 namespace itk {
 template <typename, unsigned int>
 class Point;
@@ -23,6 +20,10 @@ class Index;
 template <typename, unsigned int>
 class Vector;
 }
+namespace MatSDK
+  {
+  class MemoryEstimation;
+  }
 
 namespace PerfMonitor
   {
@@ -148,7 +149,7 @@ namespace PerfMonitor
     return stream;
     }
 
-  template <class Stream, class Type, typename std::enable_if<Type::dimension == 3>::type* = nullptr>
+  template <class Stream, class Type, typename std::enable_if<(Type::dimension > 0)>::type* = nullptr>
   Stream& operator <<(Stream& stream, const Type& point)
     {
     auto precision = stream.precision();
@@ -209,6 +210,15 @@ namespace PerfMonitor
     {
     for (size_t i=0; i<dim; ++i)
       stream << point[i] << " ";
+    return stream;
+    }
+
+  template <class Stream>
+  Stream& operator <<(Stream& stream, const MatSDK::MemoryEstimation& estimation)
+    {
+    stream << "increase: "
+      << PerfMonitor::MemoryRecord { estimation.GetIncrease() } << " peak: "
+      << PerfMonitor::MemoryRecord { std::uint64_t(estimation.GetPeak()) };
     return stream;
     }
 
