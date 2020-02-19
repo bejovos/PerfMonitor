@@ -213,8 +213,8 @@ namespace PerfMonitor
     return stream;
     }
 
-  template <class Stream>
-  Stream& operator <<(Stream& stream, const MatSDK::MemoryEstimation& estimation)
+  template <class Stream, class Estimation>
+  Stream& operator <<(Stream& stream, const Estimation& estimation)
     {
     stream << "increase: "
       << PerfMonitor::MemoryRecord { estimation.GetIncrease() } << " peak: "

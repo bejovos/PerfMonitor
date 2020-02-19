@@ -7,9 +7,9 @@ namespace PerfMonitor
   // String<'h', 'e', 'l', 'l', 'o'>
   template <char... Chars> struct String
     {
+      static constexpr char string[] = { Chars..., '\0' };
       static constexpr const char* Str()
         {
-        static constexpr char string[] = { Chars..., '\0' };
         return string;
         }
     };
@@ -87,7 +87,7 @@ namespace PerfMonitor
     template <class String, class Prefix, class Suffix>
     struct FancyString
       {
-        static constexpr size_t prefix_length = strlen(Prefix::Str());
+        static constexpr size_t prefix_length = internal::strlen(Prefix::Str());
         static constexpr size_t left = find_forward(String::Str(), Prefix::Str());
         static constexpr size_t right = find_backward(String::Str(), Suffix::Str());
         using type = typename StringToClassImpl<String, make_index_sequence<left + prefix_length, right - left - prefix_length>>::type;

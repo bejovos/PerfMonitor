@@ -62,22 +62,24 @@ namespace PerfMonitor
       }
     }
 
-  // std::int64_t GetTotalCounterValue(const size_t i_id)
-  //   {
-  //   std::lock_guard<std::recursive_mutex> lock(p_counter_storage->m_mutex);
-  //   std::int64_t result = 0;
-  //   for (const auto& ar : p_counter_storage->m_all_counters_raw)
-  //     result += ar[i_id];
-  //   return result;
-  //   }
+  size_t CounterUtils::GetTotalValue(const char* ip_name)
+    {
+    std::lock_guard<std::recursive_mutex> lock(p_counter_storage->mutex);
+    std::int64_t result = 0;
+    const size_t id = p_counter_storage->name_w_ids[ip_name]; 
+    for (const size_t* ar : p_counter_storage->counters[id].clients)
+      result += *ar;
+    return result;
+    }
 
-  // void SetTotalCounterValue(size_t i_id, std::int64_t i_value)
-  //   {
-  //   std::lock_guard<std::recursive_mutex> lock(p_counter_storage->m_mutex);
-  //   for (auto& ar : p_counter_storage->m_all_counters_raw)
-  //     ar[i_id] = 0;
-  //   p_counter_storage->m_all_counters_raw.front()[i_id] = i_value;
-  //   }
+  void CounterUtils::SetTotalValue(const char* ip_name, const size_t i_value)
+    {
+    std::lock_guard<std::recursive_mutex> lock(p_counter_storage->mutex);
+    const size_t id = p_counter_storage->name_w_ids[ip_name]; 
+    for (size_t* ar : p_counter_storage->counters[id].clients)
+      *ar = 0;
+    *p_counter_storage->counters[id].clients.front() = i_value;
+    }
 
   void DisableThreadCountTracking()
     {
@@ -93,7 +95,7 @@ namespace PerfMonitor
 
     std::wcout << L"\n";
     if (is_thread_count_tracking_enabled)
-      std::wcout << L"Num threads: " << thread_counter << L"\n";
+      std::wcout << L"Num threads: " << thread_counter.load() << L"\n";
 
     if (p_counter_storage->counters.empty())
       return;

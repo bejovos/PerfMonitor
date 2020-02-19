@@ -143,9 +143,9 @@ namespace PerfMonitor
     PERFMONITOR_API void UnRegisterCounter(size_t* ip_client);
 
     // not thread safe
-    // PERFMONITOR_API size_t GetTotalValue(size_t i_id);
+    PERFMONITOR_API size_t GetTotalValue(const char* ip_name);
     // not thread safe
-    // PERFMONITOR_API void SetTotalValue(size_t i_id, size_t i_value);
+    PERFMONITOR_API void SetTotalValue(const char* ip_name, size_t i_value);
     }
   // not thread safe, called during application exit
   PERFMONITOR_API void PrintAllCounters();
@@ -172,7 +172,17 @@ namespace PerfMonitor
       private:
         size_t data{0};
       };
-      static thread_local Storage storage; 
+
+    static Storage& GetStorage()
+      {
+      return storage;
+      }
+    static size_t GetTotal()
+      {
+      return CounterUtils::GetTotalValue(String::Str());
+      }
+
+    static thread_local Storage storage; 
     };
 
   template <class String>
@@ -181,24 +191,37 @@ namespace PerfMonitor
   template <class String>
   struct TimerSum;
   template <char... Chars>
-  struct TimerSum<String<Chars...>> : internal::non_copyable, internal::non_moveable, internal::convertable_to_bool_false
+  struct TimerSum<String<Chars...>>
+    : internal::non_copyable
+    , internal::non_moveable
+    , internal::convertable_to_bool_false
+    , Counter<String<'T', Chars...>>
     {
       ~TimerSum()
         {
-        Counter<String<'T', Chars...>>::storage.Increment(FinalizeTimeCounter(m_value));
+        Counter<String<'T', Chars...>>::GetStorage().Increment(FinalizeTimeCounter(m_value));
         }
-
+      static std::chrono::microseconds GetTotal()
+        {
+        return std::chrono::microseconds{
+          static_cast<size_t>(Counter<String<'T', Chars...>>::GetTotal() 
+          * GetInvFrequency())};
+        }
       const std::int64_t m_value = InitTimeCounter();
     };
 
   template <class String>
   struct StaticCounter;
   template <char... Chars>
-  struct StaticCounter<String<Chars...>> : internal::non_copyable, internal::non_moveable, internal::convertable_to_bool_false
+  struct StaticCounter<String<Chars...>>
+    : internal::non_copyable
+    , internal::non_moveable
+    , internal::convertable_to_bool_false
+    , Counter<String<'C', Chars...>> 
     {
       StaticCounter(const size_t value = 1)
         {
-        Counter<String<'C', Chars...>>::storage.Increment(value);
+        Counter<String<'T', Chars...>>::GetStorage().Increment(value);
         }
     }; 
 

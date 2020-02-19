@@ -64,7 +64,7 @@
 #define PM_STRING_TO_CLASS(string, class_name)                                                    \
   struct class_name {                                                                             \
     static constexpr const char* Str() {                                                          \
-    return PerfMonitor::internal::strlen(string) == 0 ? __FUNCSIG__ : "cdecl "string "::<"; }     \
+    return PerfMonitor::internal::strlen(string) == 0 ? __FUNCSIG__ : "cdecl "string"::<"; }     \
   }                                                                                      
 #define PM_STRING_TO_LAMBDA(string)                                                               \
   [&](){                                                                                          \
@@ -139,11 +139,8 @@
     return false;                                                                                \
     }()){}else
 // Not thread-safe
-// #define STATICCOUNTER_GET(counter_name)                                                      \
-//   PerfMonitor::StaticCounter::GetTotalValue([&](){                                           \
-//     PM_MAKE_STRING_IN_CLASS(counter_name, string_in_class);                                          \
-//     return PerfMonitor::CounterInitialization<2, string_in_class>::id.GetId();               \
-//   }())
+#define STATICCOUNTER_GET(counter_name)                                                      \
+  PerfMonitor::internal::MakeFromFancyString<PerfMonitor::StaticCounter>(PM_STRING_TO_LAMBDA(counter_name), value).GetTotal() 
 // Not thread-safe
 // #define STATICCOUNTER_SET(counter_name, value)                                               \
 //   PerfMonitor::StaticCounter::SetTotalValue([&](){                                           \
@@ -175,11 +172,8 @@
   PerfMonitor::internal::MakeFromFancyString<PerfMonitor::TimerSum>(PM_STRING_TO_LAMBDA("" ## __VA_ARGS__ )) ? PerfMonitor::internal::convertible_to_any{} : 
 
 // Not thread-safe
-// #define TIMERSUM_GET(counter_name)                                              \
-// PerfMonitor::TimerSum::GetTotalValue([]() -> size_t {                           \
-//   PM_MAKE_STRING_IN_CLASS(counter_name, string_in_class);                               \
-//   return PerfMonitor::CounterInitialization<0, string_in_class>::id.GetId();    \
-// }())
+#define TIMERSUM_GET(counter_name)                                              \
+  PerfMonitor::internal::MakeFromFancyString<PerfMonitor::TimerSum>(PM_STRING_TO_LAMBDA(counter_name)).GetTotal() 
 // Not thread-safe
 // #define TIMERSUM_SET(counter_name, microseconds)                                \
 // PerfMonitor::TimerSum::SetTotalValue([]() -> size_t {                           \
