@@ -61,10 +61,11 @@
 #include "TimeAndMemoryWatcher.h"
 #include "Callbacks.h"
 
-#define PM_STRING_TO_CLASS(string, class_name)                                                    \
-  struct class_name {                                                                             \
-    static constexpr const char* Str() {                                                          \
-    return PerfMonitor::internal::strlen(string) == 0 ? __FUNCSIG__ : "cdecl "string"::<"; }     \
+/// @todo: add __LINE__ to funcsig, usecase: several anonimous staticcounter in the same function 
+#define PM_STRING_TO_CLASS(string, class_name)                                                               \
+  struct class_name {                                                                                        \
+    static constexpr const char* Str() {                                                                     \
+    return PerfMonitor::internal::strlen(string) == 0 ? __FUNCSIG__ : "cdecl "string"::<" ; }                \
   }                                                                                      
 #define PM_STRING_TO_LAMBDA(string)                                                               \
   [&](){                                                                                          \
@@ -95,7 +96,7 @@
     using namespace PerfMonitor;                                                                                              \
     PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                                                    \
     }(), nullptr))                                                                                                            \
-    ){}else                    
+  ){}else                    
 
 #define TIMERMEMORY(...) \
   if (const auto&& indention_info = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, true>>((   \
@@ -103,7 +104,7 @@
     using namespace PerfMonitor;                                                                                              \
     PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                                                    \
     }(), nullptr))                                                                                                            \
-    ){}else                    
+  ){}else                    
 
 #define TIMER_INIT(...) \
   (PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), PerfMonitor::TimeAndMemoryWatcher<true, false>()) ? \
@@ -130,17 +131,21 @@
 #undef STATICCOUNTER_SET
 #undef STATICCOUNTER_RESET
 
-#define STATICCOUNTER(...)                                                                        \
-  if (const auto& indention_info = PerfMonitor::internal::MakeFromFancyString<PerfMonitor::StaticCounter>(PM_STRING_TO_LAMBDA("" ## __VA_ARGS__))) {}else
+#define STATICCOUNTER(...)                                                                                  \
+  if (const auto& indention_info = PerfMonitor::internal::MakeFromFancyString<PerfMonitor::StaticCounter>(  \
+    PM_STRING_TO_LAMBDA("" ## __VA_ARGS__))                                                                 \
+  ){}else
 
 #define STATICCOUNTER_ADD(counter_name, value)                                                   \
   if ([&](){                                                                                     \
-    PerfMonitor::internal::MakeFromFancyString<PerfMonitor::StaticCounter>(PM_STRING_TO_LAMBDA("" ## counter_name), value); \
+    PerfMonitor::internal::MakeFromFancyString<PerfMonitor::StaticCounter>(                      \
+    PM_STRING_TO_LAMBDA("" ## counter_name), value);                                             \
     return false;                                                                                \
-    }()){}else
+    }()                                                                                          \
+  ){}else
 // Not thread-safe
 #define STATICCOUNTER_GET(counter_name)                                                      \
-  PerfMonitor::internal::MakeFromFancyString<PerfMonitor::StaticCounter>(PM_STRING_TO_LAMBDA(counter_name), value).GetTotal() 
+  PerfMonitor::internal::MakeFromFancyString<PerfMonitor::StaticCounter>(PM_STRING_TO_LAMBDA(counter_name), 0u).GetTotal() 
 // Not thread-safe
 // #define STATICCOUNTER_SET(counter_name, value)                                               \
 //   PerfMonitor::StaticCounter::SetTotalValue([&](){                                           \
@@ -197,18 +202,19 @@
 #undef INFO_SCOPED
 
 #define COLOR(color, ...) PerfMonitor::MakeColoredValue(color, __VA_ARGS__)
-#define INFO(...)                                                          \
-if (PerfMonitor::Indention::Indent indendent_info = ([&]()                 \
-  {                                                                        \
-  using namespace PerfMonitor;                                             \
-  PerfMonitor::PrintIfArgsEmpty(true, __FILE__, __LINE__, __VA_ARGS__);    \
-  }(), nullptr)){}else                                                               
-#define INFO_SCOPED(...)                                                   \
-PerfMonitor::Indention::Indent temporary_indendent_info_1 = ([&]()         \
-  {                                                                        \
-  using namespace PerfMonitor;                                             \
-  PerfMonitor::PrintIfArgsEmpty(true, __FILE__, __LINE__, __VA_ARGS__);    \
-  }(), nullptr);
+#define INFO(...)                                                                                        \
+  if (auto&& indendent_info = PerfMonitor::internal::MakeFromNothing<PerfMonitor::Indention::Indent>((   \
+    [&](){                                                                                               \
+    using namespace PerfMonitor;                                                                         \
+    PerfMonitor::PrintIfArgsEmpty(true, __FILE__, __LINE__, __VA_ARGS__);                                \
+    }(), nullptr))                                                                                       \
+  ){}else                                                                                 
+#define INFO_SCOPED(...)                                                                                     \
+  auto temporary_indendent_info_1 = PerfMonitor::internal::MakeFromNothing<PerfMonitor::Indention::Indent>(( \
+    [&](){                                                                                                   \
+    using namespace PerfMonitor;                                                                             \
+    PerfMonitor::PrintIfArgsEmpty(true, __FILE__, __LINE__, __VA_ARGS__);                                    \
+    }(), nullptr));                                                                                          
 
 #endif
 
@@ -222,7 +228,27 @@ PerfMonitor::Indention::Indent temporary_indendent_info_1 = ([&]()         \
 * @code
 * PASSERT(i > 0) std::cout << i; @endcode
 */
-#define PASSERT(...) if (auto indendent_info = PerfMonitor::BreakInDestructor(__VA_ARGS__)){}else 
+#define PASSERT(...)                                                                                          \
+  if (const auto&& indention_info =                                                                           \
+    [&](){                                                                                                    \
+      const bool value = __VA_ARGS__;                                                                         \
+      struct Result                                                                                           \
+        {                                                                                                     \
+          bool m_value;                                                                                       \
+        ~Result()                                                                                             \
+          {                                                                                                   \
+          if (m_value == false)                                                                               \
+            __debugbreak();                                                                                   \
+          }                                                                                                   \
+        operator bool() const                                                                                 \
+          {                                                                                                   \
+          return m_value;                                                                                     \
+          }                                                                                                   \
+        };                                                                                                    \
+      return Result{value};                                                                                   \
+    }()                                                                                                       \
+  ){}else                                                                                                   
+
 #endif
 
 /**

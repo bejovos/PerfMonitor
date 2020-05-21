@@ -22,7 +22,7 @@ namespace PerfMonitor
 
     struct Indent : internal::non_copyable, internal::non_moveable, internal::IObject, internal::convertable_to_bool_false
       {
-      Indent(nullptr_t)
+      Indent()
         {
         PushIndention(' ', this);
         }
