@@ -221,7 +221,7 @@ namespace PerfMonitor
     {
       StaticCounter(const size_t value = 1)
         {
-        Counter<String<'T', Chars...>>::GetStorage().Increment(value);
+        Counter<String<'C', Chars...>>::GetStorage().Increment(value);
         }
     }; 
 
