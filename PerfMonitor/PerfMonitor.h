@@ -14,43 +14,6 @@
   #define OPTIONS_DEBUG 1
 #endif
 
-#undef COLOR
-#undef INFO
-#undef INFO_SCOPED
-#undef TIMER
-#undef TIMERMEMORY
-#undef TIMER_INIT
-#undef TIMERMEMORY_INIT
-#undef TIMERMEMORY_SCOPED
-#undef TIMERSUM_SCOPED
-#undef TIMERSUM
-#undef TIMERSUM_GET
-#undef TIMERSUM_SET
-#undef STATICCOUNTER
-#undef STATICCOUNTER_GET
-#undef STATICCOUNTER_SET
-#undef STATICCOUNTER_RESET
-#undef PASSERT
-
-#define COLOR(color, ...) __VA_ARGS__
-#define INFO(...)
-#define INFO_SCOPED(...)
-#define TIMER(...)
-#define TIMERMEMORY(...)
-#define TIMER_INIT(...)
-#define TIMERMEMORY_INIT(...)
-#define TIMERMEMORY_SCOPED(...)
-#define TIMERSUM_SCOPED(...)
-#define TIMERSUM(...)
-#define TIMERSUM_GET(...) std::chrono::microseconds{0}
-#define TIMERSUM_SET(...) 
-#define STATICCOUNTER(...)
-#define STATICCOUNTER_GET(...) size_t{0}
-#define STATICCOUNTER_SET(...)
-#define STATICCOUNTER_RESET(...)
-#define PASSERT(...) if(true){}else
-
-
 //////////////////////////////////////////////////////////////////////////
 
 #include "WriteToStream.h"
@@ -62,24 +25,28 @@
 #include "Callbacks.h"
 
 /// @todo: add __LINE__ to funcsig, usecase: several anonimous staticcounter in the same function 
-#define PM_STRING_TO_CLASS(string, class_name)                                                               \
-  struct class_name {                                                                                        \
-    static constexpr const char* Str() {                                                                     \
-    return PerfMonitor::internal::strlen(string) == 0 ? __FUNCSIG__ : "cdecl "string"::<" ; }                \
+#define PM_STRING_TO_CLASS(string, class_name)                                                    \
+  struct class_name {                                                                             \
+    static constexpr const char* Str() {                                                          \
+    return PerfMonitor::internal::strlen(string) == 0 ? __FUNCSIG__ : "cdecl "string"::<" ; }     \
   }                                                                                      
 #define PM_STRING_TO_LAMBDA(string)                                                               \
   [&](){                                                                                          \
     PM_STRING_TO_CLASS(string, temporary);                                                        \
     return temporary{};                                                                           \
     }()
+#define PM_CONCATENATE_IMPL(x, y) x ## y 
+#define PM_CONCATENATE(x, y) PM_CONCATENATE_IMPL(x, y)
+#define PM_INDENTION_NAME PM_CONCATENATE(indention_info, __COUNTER__)
 
 // TIMER
-#if OPTIONS_TIMERMEMORY
 #undef TIMER
-#undef TIMERMEMORY
 #undef TIMER_INIT
+#undef TIMER_SCOPED
+#undef TIMERMEMORY
 #undef TIMERMEMORY_INIT
 #undef TIMERMEMORY_SCOPED
+#if OPTIONS_TIMERMEMORY
 
 /**
 * @brief Timer. Prints elapsed time to cout in its destructor. Nested scope is indented.
@@ -98,6 +65,18 @@
     }(), nullptr))                                                                                                            \
   ){}else                    
 
+#define TIMER_INIT(...) \
+  (PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), PerfMonitor::TimeAndMemoryWatcher<true, false>()) ? \
+    PerfMonitor::internal::convertible_to_any{} :                                                                             \
+
+#define TIMER_SCOPED(...) \
+  const auto&& PM_INDENTION_NAME = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, false>>((       \
+    [&](){                                                                                                                    \
+    using namespace PerfMonitor;                                                                                              \
+    PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                                                    \
+    }(), nullptr))                                                                                                            
+
+
 #define TIMERMEMORY(...) \
   if (const auto&& indention_info = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, true>>((   \
     [&](){                                                                                                                    \
@@ -106,30 +85,31 @@
     }(), nullptr))                                                                                                            \
   ){}else                    
 
-#define TIMER_INIT(...) \
-  (PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), PerfMonitor::TimeAndMemoryWatcher<true, false>()) ? \
-    PerfMonitor::internal::convertible_to_any{} :                                                                             \
-
 #define TIMERMEMORY_INIT(...) \
   (PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), PerfMonitor::TimeAndMemoryWatcher<true, true>()) ?  \
     PerfMonitor::internal::convertible_to_any{} :                                                                             \
 
 #define TIMERMEMORY_SCOPED(...) \
-  const auto&& indention_info = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, true>>((       \
+  const auto&& PM_INDENTION_NAME = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, true>>((       \
     [&](){                                                                                                                    \
     using namespace PerfMonitor;                                                                                              \
     PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                                                    \
     }(), nullptr))                                                                                                            
 
+#else
+  #define TIMER(...) 
+  #define TIMER_INIT(...) 
+  #define TIMER_SCOPED(...) 
+  #define TIMERMEMORY(...) 
+  #define TIMERMEMORY_INIT(...) 
+  #define TIMERMEMORY_SCOPED(...) 
 #endif
 
 // STATICCOUNTER
-#if OPTIONS_COUNTERS
 #undef STATICCOUNTER
 #undef STATICCOUNTER_ADD
 #undef STATICCOUNTER_GET
-#undef STATICCOUNTER_SET
-#undef STATICCOUNTER_RESET
+#if OPTIONS_COUNTERS
 
 #define STATICCOUNTER(...)                                                                                  \
   if (const auto& indention_info = PerfMonitor::internal::MakeFromFancyString<PerfMonitor::StaticCounter>(  \
@@ -160,17 +140,21 @@
 //     return false;                                         \
 //     }()){}else
 
+#else
+  #define STATICCOUNTER(...)
+  #define STATICCOUNTER_ADD(counter_name, value)
+  #define STATICCOUNTER_GET(counter_name) size_t{0}
 #endif
 
 // TIMERSUM
-#if OPTIONS_TIMERMEMORY && OPTIONS_COUNTERS
 #undef TIMERSUM_SCOPED
 #undef TIMERSUM
+#undef TIMERSUM_INIT
 #undef TIMERSUM_GET
-#undef TIMERSUM_SET
+#if OPTIONS_TIMERMEMORY && OPTIONS_COUNTERS
 
 #define TIMERSUM_SCOPED(...)                                                   \
-  const auto& indention_info = PerfMonitor::internal::MakeFromFancyString<PerfMonitor::TimerSum>(PM_STRING_TO_LAMBDA("" ## __VA_ARGS__));
+  const auto& PM_INDENTION_NAME = PerfMonitor::internal::MakeFromFancyString<PerfMonitor::TimerSum>(PM_STRING_TO_LAMBDA("" ## __VA_ARGS__))
 #define TIMERSUM(...)                                                          \
   if (const auto& indention_info = PerfMonitor::internal::MakeFromFancyString<PerfMonitor::TimerSum>(PM_STRING_TO_LAMBDA("" ## __VA_ARGS__ ))) {}else
 #define TIMERSUM_INIT(...)                                                     \
@@ -193,15 +177,18 @@
 //     return false;                                                               \
 //     }()){}else
 
-#endif 
+#else
+  #define TIMERSUM_SCOPED(...)                                                   
+  #define TIMERSUM(...)                                                          
+  #define TIMERSUM_INIT(...)                                                     
+  #define TIMERSUM_GET(counter_name) std::chrono::microseconds{0}                                              
+#endif
 
 // INFO
-#if OPTIONS_INFO
 #undef COLOR
 #undef INFO
 #undef INFO_SCOPED
-
-#define COLOR(color, ...) PerfMonitor::MakeColoredValue(color, __VA_ARGS__)
+#if OPTIONS_INFO
 #define INFO(...)                                                                                        \
   if (auto&& indendent_info = PerfMonitor::internal::MakeFromNothing<PerfMonitor::Indention::Indent>((   \
     [&](){                                                                                               \
@@ -210,17 +197,20 @@
     }(), nullptr))                                                                                       \
   ){}else                                                                                 
 #define INFO_SCOPED(...)                                                                                     \
-  auto temporary_indendent_info_1 = PerfMonitor::internal::MakeFromNothing<PerfMonitor::Indention::Indent>(( \
+  auto PM_INDENTION_NAME = PerfMonitor::internal::MakeFromNothing<PerfMonitor::Indention::Indent>(( \
     [&](){                                                                                                   \
     using namespace PerfMonitor;                                                                             \
     PerfMonitor::PrintIfArgsEmpty(true, __FILE__, __LINE__, __VA_ARGS__);                                    \
     }(), nullptr));                                                                                          
 
+#else
+  #define INFO(...)                                                                                        
+  #define INFO_SCOPED(...)                                                                                     
 #endif
 
-// _ASSERT
-#if OPTIONS_DEBUG
+// ASSERT
 #undef PASSERT
+#if OPTIONS_DEBUG
 
 /**
 * @brief Simple assert. Condition should be always true. Nested scope is executed BEFORE triggering debug break.
@@ -231,7 +221,6 @@
 #define PASSERT(...)                                                                                          \
   if (const auto&& indention_info =                                                                           \
     [&](){                                                                                                    \
-      const bool value = __VA_ARGS__;                                                                         \
       struct Result                                                                                           \
         {                                                                                                     \
           bool m_value;                                                                                       \
@@ -245,10 +234,12 @@
           return m_value;                                                                                     \
           }                                                                                                   \
         };                                                                                                    \
-      return Result{value};                                                                                   \
+      return Result{__VA_ARGS__};                                                                             \
     }()                                                                                                       \
   ){}else                                                                                                   
 
+#else
+  #define PASSERT(...) if(true){}else
 #endif
 
 /**
