@@ -177,7 +177,7 @@ namespace PerfMonitor
       {
       return storage;
       }
-    static size_t GetTotal()
+    [[nodiscard]] static size_t GetTotal()
       {
       return CounterUtils::GetTotalValue(String::Str());
       }
@@ -201,7 +201,7 @@ namespace PerfMonitor
         {
         Counter<String<'T', Chars...>>::GetStorage().Increment(FinalizeTimeCounter(m_value));
         }
-      static std::chrono::microseconds GetTotal()
+      [[nodiscard]] static std::chrono::microseconds GetTotal()
         {
         return std::chrono::microseconds{
           static_cast<size_t>(Counter<String<'T', Chars...>>::GetTotal() 

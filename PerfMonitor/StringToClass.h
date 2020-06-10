@@ -94,7 +94,7 @@ namespace PerfMonitor
       };
 
     template <template <class> class Result, class Str, class... Args>
-    Result<typename FancyString<Str, String<'c', 'd', 'e', 'c', 'l', ' '>, String<':',':','<'>>::type> MakeFromFancyString(const Str&, Args&&... i_args)
+    [[nodiscard]] Result<typename FancyString<Str, String<'c', 'd', 'e', 'c', 'l', ' '>, String<':',':','<'>>::type> MakeFromFancyString(const Str&, Args&&... i_args)
       {
       return {std::forward<Args>(i_args)...};
       }
