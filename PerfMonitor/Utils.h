@@ -8,9 +8,10 @@ namespace PerfMonitor
   {
   enum Color
     {
-    Green = 10,
     LightGray = 7,
+    Green = 10,
     Red = 12,
+    Purple = 13,
     Yellow = 14
     };
 
