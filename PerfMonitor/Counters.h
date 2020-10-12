@@ -146,6 +146,8 @@ namespace PerfMonitor
     PERFMONITOR_API size_t GetTotalValue(const char* ip_name);
     // not thread safe
     PERFMONITOR_API void SetTotalValue(const char* ip_name, size_t i_value);
+    // not thread safe
+    PERFMONITOR_API void ResetCounters(const char* ip_regexp, const char* ip_regexp_to_print = ".*");
     }
   // not thread safe, called during application exit
   PERFMONITOR_API void PrintAllCounters();
@@ -177,7 +179,13 @@ namespace PerfMonitor
       {
       return storage;
       }
-    [[nodiscard]] static size_t GetTotal()
+
+    static void SetTotal(size_t value)
+      {
+      CounterUtils::SetTotalValue(String::Str(), value);
+      }
+
+    static size_t GetTotal()
       {
       return CounterUtils::GetTotalValue(String::Str());
       }
@@ -201,12 +209,17 @@ namespace PerfMonitor
         {
         Counter<String<'T', Chars...>>::GetStorage().Increment(FinalizeTimeCounter(m_value));
         }
-      [[nodiscard]] static std::chrono::microseconds GetTotal()
+      static std::chrono::microseconds GetTotal()
         {
         return std::chrono::microseconds{
           static_cast<size_t>(Counter<String<'T', Chars...>>::GetTotal() 
           * GetInvFrequency())};
         }
+      static void SetTotal(std::chrono::microseconds time)
+        {
+        Counter<String<'T', Chars...>>::SetTotal(static_cast<size_t>(time.count() / GetInvFrequency()));
+        }
+
       const std::int64_t m_value = InitTimeCounter();
     };
 
@@ -219,7 +232,7 @@ namespace PerfMonitor
     , internal::convertable_to_bool_false
     , Counter<String<'C', Chars...>> 
     {
-      StaticCounter(const size_t value = 1)
+      void Add(const size_t value = 1)
         {
         Counter<String<'C', Chars...>>::GetStorage().Increment(value);
         }

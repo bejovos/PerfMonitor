@@ -3,18 +3,17 @@
 #include "TimeAndMemoryWatcher.h"
 #include "WriteToStream.h"
 
+#include <atomic>
 #include <csignal>
-#include <deque>
 #include <iostream>
 #include <map>
 #include <mutex>
-#include <queue>
+#include <regex>
+#include <set>
 #include <string>
 #include <thread>
 #include <utility>
 #include <vector>
-#include <set>
-#include <atomic>
 
 struct CounterStorage
   {
@@ -79,6 +78,41 @@ namespace PerfMonitor
     for (size_t* ar : p_counter_storage->counters[id].clients)
       *ar = 0;
     *p_counter_storage->counters[id].clients.front() = i_value;
+    }
+
+  void CounterUtils::ResetCounters(const char* ip_regexp, const char* ip_regexp_to_print)
+    {
+    std::lock_guard<std::recursive_mutex> lock(p_counter_storage->mutex);
+    if (p_counter_storage->counters.empty())
+      return;
+    CombineAllCounters();
+
+    std::vector<std::reference_wrapper<CounterStorage>> counters { p_counter_storage->counters.begin(), p_counter_storage->counters.end() };
+    std::sort(
+      counters.begin(),
+      counters.end(),
+      [&](const std::reference_wrapper<CounterStorage> left, const std::reference_wrapper<CounterStorage> right)
+        {
+        return left.get().name < right.get().name;
+        });
+
+    std::regex reg(ip_regexp);
+    std::regex reg_to_print(ip_regexp_to_print);
+    for (const auto& counter : counters)
+      {
+      if (std::regex_match(counter.get().name.data() + 1, reg) == false)
+        continue;
+      size_t& value = counter.get().data;
+      if (std::regex_match(counter.get().name.data() + 1, reg_to_print))
+        {
+        if (counter.get().name[0] == 'T')
+          std::wcout << counter.get().name.c_str() + 1 << L" time: " << std::chrono::microseconds(
+            static_cast<long long>(value * GetInvFrequency())) << L"\n";
+        if (counter.get().name[0] == 'C')
+          std::wcout << counter.get().name.c_str() + 1 << L": " << NumericRecord<std::int64_t> { (std::int64_t)value } << L"\n";
+        }
+      value = 0;
+      }
     }
 
   void DisableThreadCountTracking()
@@ -190,7 +224,7 @@ struct CoutFinalizer : PerfMonitor::internal::IObject
 
 CoutFinalizer g_finalizer;
 
-void SIGSEGHandler(int i_sig)
+void SIGSEGHandler(int)
   {
   std::cout << PerfMonitor::Color::Red;
   std::cout << "  [Segmentation faults]\n";
