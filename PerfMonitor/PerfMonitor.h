@@ -24,24 +24,24 @@
 #include "TimeAndMemoryWatcher.h"
 #include "Callbacks.h"
 
-/// @todo: add __LINE__ to funcsig, usecase: several anonimous staticcounter in the same function 
+#define TO_STRING_IMPL(x) # x
+#define TO_STRING(x) TO_STRING_IMPL(x)
+#define PM_CONCATENATE_IMPL(x, y) x ## y 
+#define PM_CONCATENATE(x, y) PM_CONCATENATE_IMPL(x, y)
+
 #define PM_STRING_TO_CLASS(string, class_name)                                                    \
-  struct class_name {                                                                             \
-    static constexpr const char* Str() {                                                          \
-    return PerfMonitor::internal::strlen(string) == 0 ? __FUNCTION__ : string"::<" ; }     \
-  }                                                                                      
+struct class_name {                                                                               \
+  static constexpr const char* Str() { return string; }                                                 \
+  static constexpr const char* Function() { return __FUNCTION__; }                                      \
+  static constexpr const char* Line() { return "(" TO_STRING(__LINE__) "):"; }                          \
+}                                                                                                
+
 #define PM_STRING_TO_LAMBDA(string)                                                               \
   [](){                                                                                           \
     PM_STRING_TO_CLASS(string, temporary);                                                        \
     return temporary{};                                                                           \
     }()
-#define PM_CONCATENATE_IMPL(x, y) x ## y 
-#define PM_CONCATENATE(x, y) PM_CONCATENATE_IMPL(x, y)
 #define PM_INDENTION_NAME PM_CONCATENATE(indention_info, __COUNTER__)
-#define PM_END_WITH_ELSE_IMPL(counter)                                                            \
-  { goto PM_CONCATENATE(the_very_unique_label_name, counter); }                                   \
-  else PM_CONCATENATE(the_very_unique_label_name, counter):                                        
-#define PM_END_WITH_ELSE PM_END_WITH_ELSE_IMPL(__COUNTER__)                                                                 
 
 // TIMER
 #undef TIMER
@@ -66,15 +66,15 @@
     [&](){                                                                                                                    \
     using namespace PerfMonitor;                                                                                              \
     PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                                                    \
-    }(), nullptr))                                                                                                            \
-  ) PM_END_WITH_ELSE
+    }(), nullptr)); false                                                                                                     \
+  ) {} else
 
 #define TIMER_INIT(...) \
   (PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), PerfMonitor::TimeAndMemoryWatcher<true, false>()) ? \
     PerfMonitor::internal::convertible_to_any{} :                                                                             \
 
 #define TIMER_SCOPED(...) \
-  const auto&& PM_INDENTION_NAME = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, false>>((       \
+  const auto&& PM_INDENTION_NAME = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, false>>((   \
     [&](){                                                                                                                    \
     using namespace PerfMonitor;                                                                                              \
     PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                                                    \
@@ -85,8 +85,8 @@
     [&](){                                                                                                                    \
     using namespace PerfMonitor;                                                                                              \
     PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                                                    \
-    }(), nullptr))                                                                                                            \
-  ) PM_END_WITH_ELSE
+    }(), nullptr)); false                                                                                                     \
+  ) {} else
 
 #define TIMERMEMORY_INIT(...) \
   (PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), PerfMonitor::TimeAndMemoryWatcher<true, true>()) ?  \
@@ -115,21 +115,13 @@
 #undef STATICCOUNTER_SET
 #if OPTIONS_COUNTERS
 
-#define STATICCOUNTER(...)                                                                       \
-  if ([](){                                                                                      \
-    PerfMonitor::internal::MakeFromFancyString<PerfMonitor::StaticCounter>(                      \
-    PM_STRING_TO_LAMBDA("" ## __VA_ARGS__)).Add(1);                                              \
-    return false;                                                                                \
-    }()                                                                                          \
-  ) PM_END_WITH_ELSE
-
 #define STATICCOUNTER_ADD(counter_name, value)                                                   \
-  if ([](){                                                                                      \
+  if (                                                                                           \
     PerfMonitor::internal::MakeFromFancyString<PerfMonitor::StaticCounter>(                      \
-    PM_STRING_TO_LAMBDA("" ## counter_name)).Add(value);                                         \
-    return false;                                                                                \
-    }()                                                                                          \
-  ) PM_END_WITH_ELSE
+    PM_STRING_TO_LAMBDA(counter_name)).Add(value), false                                         \
+  ) {} else
+
+#define STATICCOUNTER(...) STATICCOUNTER_ADD("" ## __VA_ARGS__, 1)
 
 // Not thread-safe
 #define STATICCOUNTER_GET(counter_name)                                                      \
@@ -159,9 +151,10 @@
 #define TIMERSUM_SCOPED(...)                                                   \
   const auto& PM_INDENTION_NAME = PerfMonitor::internal::MakeFromFancyString<PerfMonitor::TimerSum>(PM_STRING_TO_LAMBDA("" ## __VA_ARGS__))
 
-#define TIMERSUM(...)                                                          \
-  if (const auto& indention_info = PerfMonitor::internal::MakeFromFancyString<PerfMonitor::TimerSum>(PM_STRING_TO_LAMBDA("" ## __VA_ARGS__ )) \
-  ) PM_END_WITH_ELSE
+#define TIMERSUM(...)                                                                                  \
+  if (const auto& indention_info = PerfMonitor::internal::MakeFromFancyString<PerfMonitor::TimerSum>(  \
+    PM_STRING_TO_LAMBDA("" ## __VA_ARGS__ )); false                                                    \
+  ) {} else
 
 #define TIMERSUM_INIT(...)                                                     \
   PerfMonitor::internal::MakeFromFancyString<PerfMonitor::TimerSum>(PM_STRING_TO_LAMBDA("" ## __VA_ARGS__ )) ? PerfMonitor::internal::convertible_to_any{} : 
@@ -193,10 +186,10 @@
     [&](){                                                                                               \
     using namespace PerfMonitor;                                                                         \
     PerfMonitor::PrintIfArgsEmpty(true, __FILE__, __LINE__, __VA_ARGS__);                                \
-    }(), nullptr))                                                                                       \
-  ) PM_END_WITH_ELSE                                                                                 
+    }(), nullptr)); false                                                                                \
+  ) {} else                                                                                 
 #define INFO_SCOPED(...)                                                                                     \
-  auto PM_INDENTION_NAME = PerfMonitor::internal::MakeFromNothing<PerfMonitor::Indention::Indent>(( \
+  auto PM_INDENTION_NAME = PerfMonitor::internal::MakeFromNothing<PerfMonitor::Indention::Indent>((          \
     [&](){                                                                                                   \
     using namespace PerfMonitor;                                                                             \
     PerfMonitor::PrintIfArgsEmpty(true, __FILE__, __LINE__, __VA_ARGS__);                                    \
@@ -235,11 +228,10 @@
         };                                                                                                    \
       return Result{__VA_ARGS__};                                                                             \
     }()                                                                                                       \
-  ){} else
+  ) {} else
 
 #else
-  #define PASSERT(...) if(true \
-  ) PM_END_WITH_ELSE
+  #define PASSERT(...) 
 #endif
 
 /**

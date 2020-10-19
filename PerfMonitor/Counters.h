@@ -229,7 +229,6 @@ namespace PerfMonitor
   struct StaticCounter<String<Chars...>>
     : internal::non_copyable
     , internal::non_moveable
-    , internal::convertable_to_bool_false
     , Counter<String<'C', Chars...>> 
     {
       void Add(const size_t value = 1)

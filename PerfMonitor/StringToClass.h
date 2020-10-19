@@ -2,111 +2,92 @@
 
 #include <utility>
 
-namespace PerfMonitor
-  {
+namespace PerfMonitor {
   // String<'h', 'e', 'l', 'l', 'o'>
-  template <char... Chars> struct String
+  template <char... Chars>
+  struct String
+  {
+    static constexpr char string[] = { Chars..., '\0' };
+
+    static constexpr const char* Str()
     {
-      static constexpr char string[] = { Chars..., '\0' };
-      static constexpr const char* Str()
-        {
-        return string;
-        }
+      return string;
+    }
+  };
+
+  namespace internal {
+    constexpr size_t strlen(const char* str)
+    {
+      size_t result = 0;
+      while (*str != '\0') {
+        ++result;
+        ++str;
+      }
+      return result;
+    }
+
+    constexpr size_t find_backward(const char* str)
+    {
+      const size_t len = strlen(str);
+      size_t i = len;
+      for (; i >= 2; --i)
+        if (str[i] == '<' && str[i - 1] == ':' && str[i - 2] == ':')
+          return i - 2;
+      return 0; 
+    }
+
+    template <class StringBuilder, class Indices>
+    struct FancyStringImpl;
+
+    template <class StringBuilder, size_t... Indices>
+    struct FancyStringImpl<StringBuilder, std::index_sequence<Indices...> >
+    {
+      using type = String<StringBuilder::GetChar(Indices)..., '\0'>;
     };
 
-  namespace internal
-    {
-    constexpr size_t strlen(const char* string)
-      {
-      size_t length = 0;
-      while (string[length] != '\0')
-        ++length;
-      return length;
-      }
-
-    constexpr size_t find_backward(const char* string, const char* substring)
-      {
-      long string_length = static_cast<long>(strlen(string));
-      long substring_length = static_cast<long>(strlen(substring));
-      for (long i = string_length - substring_length; i>=0; --i)
-        {
-        bool is_same = true;
-        for (size_t j = 0; j != substring_length; ++j)
-          if (string[i + j] != substring[j])
-            {
-            is_same = false;
-            break;
-            }
-        if (is_same)
-          return i;
-        }
-      return 0;
-      }
-
-    constexpr size_t find_forward(const char* string, const char* substring)
-      {
-      long string_length = static_cast<long>(strlen(string));
-      long substring_length = static_cast<long>(strlen(substring));
-      for (long i = 0; i<=string_length - substring_length; ++i)
-        {
-        bool is_same = true;
-        for (size_t j = 0; j != substring_length; ++j)
-          if (string[i + j] != substring[j])
-            {
-            is_same = false;
-            break;
-            }
-        if (is_same)
-          return i;
-        }
-      return 0;
-      }
-
-    template <class T, class Indices>
-    struct StringToClassImpl;
-
-    template <class T, size_t... Indices>
-    struct StringToClassImpl<T, std::integer_sequence<size_t, Indices...> >
-      {
-        using type = String<(T::Str())[Indices]...>;
-      };
-
-
-    template <size_t value, class>
-    struct AddToSequence;
-
-    template <size_t value, size_t... values>
-    struct AddToSequence<value, std::index_sequence<values...>>
-      {
-        using type = std::integer_sequence<size_t, (value + values)...>;
-      };
-
-    template <size_t from, size_t length>
-    using make_index_sequence = typename AddToSequence<from, std::make_index_sequence<length>>::type;
-
-    template <class String, class Prefix, class Suffix>
+    template <class StringHolder>
     struct FancyString
+    {
+      static constexpr const char* message = StringHolder::Str(); 
+      static constexpr const char* function = StringHolder::Function(); 
+      static constexpr const char* line = StringHolder::Line();
+      static constexpr size_t message_length = strlen(message);
+      static constexpr size_t function_length = strlen(function);
+      static constexpr size_t line_length = strlen(line);
+      static constexpr size_t function_length2 = find_backward(function);
+
+      struct Builder
       {
-        static constexpr size_t prefix_length = internal::strlen(Prefix::Str());
-        static constexpr size_t left = find_forward(String::Str(), Prefix::Str());
-        static constexpr size_t right = find_backward(String::Str(), Suffix::Str());
-        using type = typename StringToClassImpl<String, make_index_sequence<left + prefix_length, right - left - prefix_length>>::type;
+        static constexpr size_t Length()
+        {
+          if (message_length != 0)
+            return message_length;
+          return function_length2 + line_length;
+        }
+        static constexpr char GetChar(size_t v)
+        {
+          if (message_length != 0)
+            return message[v];
+          if (v < function_length2)
+            return function[v];
+          return line[v - function_length2];
+        }
       };
+
+      using type = typename FancyStringImpl<Builder, std::make_index_sequence<Builder::Length()>>::type;
+    };
 
     template <template <class> class Result, class Str, class... Args>
-    [[nodiscard]] Result<typename FancyString<Str, String<'c', 'd', 'e', 'c', 'l', ' '>, String<':',':','<'>>::type> MakeFromFancyString(const Str&, Args&&... i_args)
-      {
-      return {std::forward<Args>(i_args)...};
-      }
+    [[nodiscard]] Result<typename FancyString<Str>::type> MakeFromFancyString(const Str&, Args&&... i_args)
+    {
+      return { std::forward<Args>(i_args)... };
+    }
 
     template <class Result>
     Result MakeFromNothing(std::nullptr_t)
-      {
+    {
       return {};
-      }
-
     }
+
   }
-
-
-
+}

@@ -20,7 +20,7 @@ namespace PerfMonitor
     std::unique_ptr<internal::IObject> Initialize();
     void ForceClear();
 
-    struct Indent : internal::non_copyable, internal::non_moveable, internal::IObject, internal::convertable_to_bool_false
+    struct Indent : internal::non_copyable, internal::non_moveable, internal::IObject
       {
       Indent()
         {

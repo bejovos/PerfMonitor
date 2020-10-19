@@ -260,7 +260,7 @@ namespace PerfMonitor
         }
     if (i == -1)
       std::cout << i_file;
-    std::cout << ":" << i_line;
+    std::cout << "(" << i_line << "):";
     if (i_print_end)
       std::cout << "\n";
     SetColor(Color::LightGray);
