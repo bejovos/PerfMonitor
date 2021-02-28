@@ -80,21 +80,65 @@ namespace PerfMonitor
     *p_counter_storage->counters[id].clients.front() = i_value;
     }
 
+  std::vector<std::reference_wrapper<CounterStorage>> GetAllCountersForPrinting()
+  {
+    CombineAllCounters();
+
+    auto comparator = [&](const std::string& left, const std::string& right) -> bool {
+      auto l = left.cbegin();
+      auto r = right.cbegin();
+      for (; ; ++l, ++r) {
+        if (l == left.cend())
+          return true;
+        if (r == right.cend())
+          return false;
+
+        if (isdigit(*l)) {
+          if (isdigit(*r)) {
+            auto get_number = [](auto it, const auto end) {
+              std::string digits;
+              for (; it != end && isdigit(*it); ++it)
+                digits += *it;
+              return digits;
+            };
+
+            const std::string left_number = get_number(l, left.cend());
+            const std::string right_number = get_number(r, right.cend());
+            if (left_number.size() != right_number.size())
+              return left_number.size() < right_number.size();
+            if (left_number != right_number)
+              return left_number < right_number;
+            continue;
+          }
+          return false;
+        }
+
+        if (isdigit(*r))
+          return true;
+
+        if (*l == *r)
+          continue;
+        return *l < *r;
+      }
+    };
+
+    std::vector<std::reference_wrapper<CounterStorage>> counters{ p_counter_storage->counters.begin(), p_counter_storage->counters.end() };
+    std::sort(
+      counters.begin(),
+      counters.end(),
+      [&](const std::reference_wrapper<CounterStorage> left, const std::reference_wrapper<CounterStorage> right) {
+        return comparator(left.get().name, right.get().name);
+      });
+    return counters;
+  }
+
   void CounterUtils::ResetCounters(const char* ip_regexp, const char* ip_regexp_to_print)
     {
     std::lock_guard<std::recursive_mutex> lock(p_counter_storage->mutex);
     if (p_counter_storage->counters.empty())
       return;
-    CombineAllCounters();
 
-    std::vector<std::reference_wrapper<CounterStorage>> counters { p_counter_storage->counters.begin(), p_counter_storage->counters.end() };
-    std::sort(
-      counters.begin(),
-      counters.end(),
-      [&](const std::reference_wrapper<CounterStorage> left, const std::reference_wrapper<CounterStorage> right)
-        {
-        return left.get().name < right.get().name;
-        });
+    auto counters = GetAllCountersForPrinting();
 
     std::regex reg(ip_regexp);
     std::regex reg_to_print(ip_regexp_to_print);
@@ -133,14 +177,8 @@ namespace PerfMonitor
 
     if (p_counter_storage->counters.empty())
       return;
-    CombineAllCounters();
 
-    std::vector<std::reference_wrapper<CounterStorage>> counters{p_counter_storage->counters.begin(), p_counter_storage->counters.end()};
-    std::sort(counters.begin(), counters.end(), 
-      [&](const std::reference_wrapper<CounterStorage> left, const std::reference_wrapper<CounterStorage> right)
-      {
-      return left.get().name < right.get().name;
-      });
+    auto counters = GetAllCountersForPrinting();
 
     char previous_category = 0;
     for (const auto& counter : counters)
