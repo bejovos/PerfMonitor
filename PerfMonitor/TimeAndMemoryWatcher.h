@@ -23,48 +23,53 @@ namespace PerfMonitor
   std::unique_ptr<internal::IObject> GetMemoryWatchers();
 
   
-  template <bool WatchTime, bool WatchMemory>
+  template <bool WatchTime, bool WatchMemoryIncrease, bool WatchMemoryPeak>
   struct [[rscpp::guard]] TimeAndMemoryWatcher final : internal::non_copyable, internal::non_moveable, internal::IObject, internal::convertable_to_bool_false
     {
       TimeAndMemoryWatcher()
-        {
+      {
         if (Indention::GetLastChar() == ' ')
           Indention::PushIndention('|', this);
         else 
           Indention::PushIndention(' ', this);
 
-        if (WatchMemory)
-          {          
+        if constexpr (WatchMemoryIncrease || WatchMemoryPeak) {          
           auto start = MakeStartingMemoryStamp();          
-          // std::wcout << "(" << MemoryRecord { start.second } << ")";
           m_stamp_index = start.first;
-          }
-        if (WatchTime)
+        }
+        if constexpr (WatchTime)
           m_time_counter = InitTimeCounter();
         Indention::SetEndNeeded(true);
-        }
+      }
       
       ~TimeAndMemoryWatcher() override
-        {
-        if (WatchTime)
+      {
+        if constexpr (WatchTime)
           m_time_counter = FinalizeTimeCounter(m_time_counter);
         bool start_from_whitespace = Indention::SetEndNeeded(false);
         Indention::PopIndention();
-        if (WatchTime)
-          {
-          std::wcout << (start_from_whitespace ? L" " : L"") << L"time: " << std::chrono::microseconds(
-            static_cast<long long>(m_time_counter * GetInvFrequency()));
+        if constexpr (WatchTime) {
+          std::wcout << (start_from_whitespace ? L" " : L"");
+          std::wcout << L"time: " << std::chrono::microseconds(static_cast<long long>(m_time_counter * GetInvFrequency()));
           start_from_whitespace = true;
-          }
-        if (WatchMemory)
-          {
+        }
+        if constexpr (WatchMemoryIncrease || WatchMemoryPeak) {
           const std::pair<std::uint64_t, std::int64_t> end = MakeEndingMemoryStamp(m_stamp_index);
 
-          std::wcout << (start_from_whitespace ? L" " : L"") << L"memory: " << MemoryRecord{end.second};
-          std::wcout << L" peak: " << MemoryRecord { end.first };
+          if constexpr (WatchMemoryIncrease) {
+            std::wcout << (start_from_whitespace ? L" " : L"");
+            std::wcout << L"memory: " << MemoryRecord{ end.second };
+            start_from_whitespace = true;
           }
-        std::wcout << L"\n";
+
+          if constexpr (WatchMemoryPeak) {
+            std::wcout << (start_from_whitespace ? L" " : L"");
+            std::wcout << L" peak: " << MemoryRecord { end.first };
+            start_from_whitespace = true;
+          }
         }
+        std::wcout << L"\n";
+      }
 
       std::int64_t m_time_counter;
       size_t m_stamp_index;

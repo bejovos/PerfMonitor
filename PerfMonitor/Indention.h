@@ -22,9 +22,9 @@ namespace PerfMonitor
 
     struct Indent : internal::non_copyable, internal::non_moveable, internal::IObject
       {
-      Indent()
+      Indent(char symbol = ' ')
         {
-        PushIndention(' ', this);
+        PushIndention(symbol, this);
         }
 
       ~Indent() override

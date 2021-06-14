@@ -7,6 +7,7 @@
 #include <iostream>
 #include <iomanip>
 #include <chrono>
+#include <any>
 
 #include "_API.h"
 #include "IObject.h"
@@ -14,33 +15,34 @@
 #include "StringToClass.h"
 
 // Records
-namespace PerfMonitor
-  {
+namespace PerfMonitor {
   struct MemoryRecord
-    {
-      std::int64_t counter;
-      bool print_sign;
-      template <class T, typename std::enable_if<std::is_signed<T>::value>::type* = nullptr>
-      explicit MemoryRecord(const T& value)
-        : counter(value), print_sign(true)
-        {
-        }
-      template <class T, typename std::enable_if<std::is_unsigned<T>::value>::type* = nullptr>
-      explicit MemoryRecord(const T& value)
-         : counter(value), print_sign(false)
-         {
-         }
-    };
+  {
+    std::int64_t counter;
+    bool print_sign;
+
+    template <class T, typename std::enable_if<std::is_signed<T>::value>::type* = nullptr>
+    explicit MemoryRecord(const T& value)
+      : counter(value)
+      , print_sign(true)
+    { }
+
+    template <class T, typename std::enable_if<std::is_unsigned<T>::value>::type* = nullptr>
+    explicit MemoryRecord(const T& value)
+      : counter(value)
+      , print_sign(false)
+    { }
+  };
 
   template <class T>
   struct NumericRecord
-    {
-      T counter;
-    };
+  {
+    T counter;
+  };
 
   template <class Stream>
   Stream& operator <<(Stream& stream, const std::chrono::microseconds& record)
-    {
+  {
     const double time = static_cast<double>(record.count());
     auto precision = stream.precision();
     auto flags = stream.flags();
@@ -64,27 +66,25 @@ namespace PerfMonitor
     stream.flags(flags);
     stream.precision(precision);
     return stream;
-    }
+  }
 
   template <class Stream>
   Stream& operator <<(Stream& stream, const MemoryRecord& record)
-    {
+  {
     double memory = static_cast<double>(record.counter);
     auto precision = stream.precision();
     auto flags = stream.flags();
     stream << std::fixed;
     SetColor(Color::Yellow);
-    if (record.print_sign)
-      {
+    if (record.print_sign) {
       if (memory >= 0)
         stream << '+';
-      else
-        {
+      else {
         stream << '-';
         memory = - memory;
-        }
       }
-    
+    }
+
     if (memory < 1000)
       stream << std::setprecision(0) << round(memory) << " b";
     else if (memory < 1. * 1024 * 10)
@@ -109,11 +109,11 @@ namespace PerfMonitor
     stream.flags(flags);
     stream.precision(precision);
     return stream;
-    }
+  }
 
   template <class Stream, class T>
   Stream& operator <<(Stream& stream, const NumericRecord<T>& record)
-    {
+  {
     std::stringstream buf;
     buf << record.counter;
     const std::string s = buf.str();
@@ -123,118 +123,149 @@ namespace PerfMonitor
     int i = 0;
     for (; i < vv; ++i)
       stream << s[i];
-    for (int j = 0; j < v; ++j)
-      {
+    for (int j = 0; j < v; ++j) {
       stream << "\'" << s[i] << s[i + 1] << s[i + 2];
       i += 3;
-      }
-    return stream;
     }
-
+    return stream;
   }
 
-namespace PerfMonitor
-  {
+}
+
+namespace PerfMonitor {
   PERFMONITOR_API void DisableThreadCountTracking();
-  namespace CounterUtils
-    {
-    // if name starts from 'T' - Time counter, 'C' - Regular counter
-    PERFMONITOR_API void RegisterCounter(const char* ip_name, size_t* ip_client);
+
+  namespace CounterUtils {
+    PERFMONITOR_API void RegisterCounter(const char* const* ip_counter, size_t* ip_client);
     PERFMONITOR_API void UnRegisterCounter(size_t* ip_client);
+    PERFMONITOR_API void*& RegisterGlobalVariable(const char* const* ip_counter);
 
     // not thread safe
-    PERFMONITOR_API size_t GetTotalValue(const char* ip_name);
+    // PERFMONITOR_API size_t GetTotalValue(const char* ip_name);
     // not thread safe
-    PERFMONITOR_API void SetTotalValue(const char* ip_name, size_t i_value);
+    // PERFMONITOR_API void SetTotalValue(const char* ip_name, size_t i_value);
     // not thread safe
     PERFMONITOR_API void ResetCounters(const char* ip_regexp, const char* ip_regexp_to_print = ".*");
-    }
+  }
+
   // not thread safe, called during application exit
   PERFMONITOR_API void PrintAllCounters();
 
-  template <class String>
+  template <class TypeString, class MessageString, class FileString, class FunctionString, class LineString>
+  struct CounterParams
+  {
+    static constexpr const char* strings[] = {
+      TypeString::Str(),
+      MessageString::Str(),
+      FileString::Str(),
+      FunctionString::Str(),
+      LineString::Str()
+    };
+  };
+
+  template <class CounterParams>
   struct Counter
-    {
+  {
     struct Storage
+    {
+      explicit Storage()
       {
-        explicit Storage()
-          {
-          CounterUtils::RegisterCounter(String::Str(), &data); 
-          }
-        ~Storage()
-          {
-          CounterUtils::UnRegisterCounter(&data);
-          }
-
-        void Increment(const size_t i_value)
-          {
-          data += i_value;
-          }
-
-      private:
-        size_t data{0};
-      };
-
-    static Storage& GetStorage()
-      {
-      return storage;
+        CounterUtils::RegisterCounter(CounterParams::strings, &data);
       }
 
-    static void SetTotal(size_t value)
+      ~Storage()
       {
-      CounterUtils::SetTotalValue(String::Str(), value);
+        CounterUtils::UnRegisterCounter(&data);
       }
 
-    static size_t GetTotal()
+      void Increment(const size_t i_value)
       {
-      return CounterUtils::GetTotalValue(String::Str());
+        data += i_value;
       }
 
-    static thread_local Storage storage; 
+      size_t data{ 0 };
     };
 
-  template <class String>
-  thread_local typename Counter<String>::Storage Counter<String>::storage;
+    static thread_local Storage storage;
+  };
 
-  template <class String>
-  struct TimerSum;
-  template <char... Chars>
-  struct TimerSum<String<Chars...>>
+  template <class CounterParams>
+  thread_local typename Counter<CounterParams>::Storage Counter<CounterParams>::storage;
+
+  template <class... Strings>
+  struct TimerSum
     : internal::non_copyable
     , internal::non_moveable
     , internal::convertable_to_bool_false
-    , Counter<String<'T', Chars...>>
+    , Counter<CounterParams<String<'T'>, Strings...>>
+  {
+    ~TimerSum()
     {
-      ~TimerSum()
-        {
-        Counter<String<'T', Chars...>>::GetStorage().Increment(FinalizeTimeCounter(m_value));
-        }
-      static std::chrono::microseconds GetTotal()
-        {
-        return std::chrono::microseconds{
-          static_cast<size_t>(Counter<String<'T', Chars...>>::GetTotal() 
-          * GetInvFrequency())};
-        }
-      static void SetTotal(std::chrono::microseconds time)
-        {
-        Counter<String<'T', Chars...>>::SetTotal(static_cast<size_t>(time.count() / GetInvFrequency()));
-        }
+      Counter<CounterParams<String<'T'>, Strings...>>::storage.Increment(FinalizeTimeCounter(m_value));
+    }
 
-      const std::int64_t m_value = InitTimeCounter();
-    };
+    const std::int64_t m_value = InitTimeCounter();
+  };
 
-  template <class String>
-  struct StaticCounter;
-  template <char... Chars>
-  struct StaticCounter<String<Chars...>>
+  template <class... Strings>
+  struct StaticCounter
     : internal::non_copyable
     , internal::non_moveable
-    , Counter<String<'C', Chars...>> 
+    , Counter<CounterParams<String<'C'>, Strings...>>
+  {
+    void Add(const size_t value = 1)
     {
-      void Add(const size_t value = 1)
-        {
-        Counter<String<'C', Chars...>>::GetStorage().Increment(value);
-        }
-    }; 
+      Counter<CounterParams<String<'C'>, Strings...>>::storage.Increment(value);
+    }
+  };
 
-  }
+  template <class... Strings>
+  struct GlobalVariableHandler
+    : internal::non_copyable
+    , internal::non_moveable
+  {
+    using params = CounterParams<String<'V'>, Strings...>;
+    static std::any* Init()
+    {
+      void*& tmp = 
+        CounterUtils::RegisterGlobalVariable(params::strings);
+      if (tmp == nullptr)
+        tmp = new std::any();
+      return (std::any*)tmp;
+    }
+
+    template <class T>
+    T& get()
+    {
+      if (data == nullptr)
+        data = Init();
+      return std::any_cast<T&>(*data);
+    }
+
+    template <class T>
+    T set(T variable)
+    {
+      if (data == nullptr)
+        data = Init();
+      *data = variable;
+      std::cout << Purple << "#" << params::strings[1] << LightGray << " = " << variable << "\n"; 
+      return variable;
+    }
+
+    template <class T>
+    auto read()
+    {
+      std::cout << Purple << "#" << params::strings[1] << LightGray << " = "; 
+      T t;
+      std::cin >> t;
+      if (data == nullptr)
+        data = Init();
+      *data = t;
+    }
+
+    static std::any* data;
+  };
+
+  template <class... Strings>
+  std::any* GlobalVariableHandler<Strings...>::data = nullptr;
+}

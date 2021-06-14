@@ -31,9 +31,10 @@
 
 #define PM_STRING_TO_CLASS(string, class_name)                                                    \
 struct class_name {                                                                               \
-  static constexpr const char* Str() { return string; }                                                 \
-  static constexpr const char* Function() { return __FUNCTION__; }                                      \
-  static constexpr const char* Line() { return "(" TO_STRING(__LINE__) "):"; }                          \
+  static constexpr const char* Str() { return string; }                                           \
+  static constexpr const char* File() { return __FILE__; }                                        \
+  static constexpr const char* Function() { return __FUNCTION__; }                                \
+  static constexpr const char* Line() { return "(" TO_STRING(__LINE__) ")"; }                     \
 }                                                                                                
 
 #define PM_STRING_TO_LAMBDA(string)                                                               \
@@ -62,7 +63,7 @@ struct class_name {                                                             
 *   } @endcode
 */
 #define TIMER(...) \
-  if (const auto&& indention_info = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, false>>((  \
+  if (const auto&& indention_info = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, false, false>>((  \
     [&](){                                                                                                                    \
     using namespace PerfMonitor;                                                                                              \
     PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                                                    \
@@ -70,18 +71,26 @@ struct class_name {                                                             
   ) {} else
 
 #define TIMER_INIT(...) \
-  (PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), PerfMonitor::TimeAndMemoryWatcher<true, false>()) ? \
+  (PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), PerfMonitor::TimeAndMemoryWatcher<true, false, false>()) ? \
     PerfMonitor::internal::convertible_to_any{} :                                                                             \
 
 #define TIMER_SCOPED(...) \
-  const auto&& PM_INDENTION_NAME = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, false>>((   \
+  const auto&& PM_INDENTION_NAME = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, false, false>>((   \
     [&](){                                                                                                                    \
     using namespace PerfMonitor;                                                                                              \
     PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                                                    \
     }(), nullptr))                                                                                                            
 
 #define TIMERMEMORY(...) \
-  if (const auto&& indention_info = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, true>>((   \
+  if (const auto&& indention_info = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, true, true>>((   \
+    [&](){                                                                                                                    \
+    using namespace PerfMonitor;                                                                                              \
+    PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                                                    \
+    }(), nullptr)); false                                                                                                     \
+  ) {} else
+
+#define TIMERPEAK(...) \
+  if (const auto&& indention_info = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, false, true>>((   \
     [&](){                                                                                                                    \
     using namespace PerfMonitor;                                                                                              \
     PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                                                    \
@@ -89,11 +98,11 @@ struct class_name {                                                             
   ) {} else
 
 #define TIMERMEMORY_INIT(...) \
-  (PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), PerfMonitor::TimeAndMemoryWatcher<true, true>()) ?  \
+  (PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__), PerfMonitor::TimeAndMemoryWatcher<true, true, true>()) ?  \
     PerfMonitor::internal::convertible_to_any{} :                                                                             \
 
 #define TIMERMEMORY_SCOPED(...) \
-  const auto&& PM_INDENTION_NAME = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, true>>((       \
+  const auto&& PM_INDENTION_NAME = PerfMonitor::internal::MakeFromNothing<PerfMonitor::TimeAndMemoryWatcher<true, true, true>>((    \
     [&](){                                                                                                                    \
     using namespace PerfMonitor;                                                                                              \
     PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                                                    \
@@ -104,6 +113,7 @@ struct class_name {                                                             
   #define TIMER_INIT(...) 
   #define TIMER_SCOPED(...) 
   #define TIMERMEMORY(...) 
+  #define TIMERPEAK(...)
   #define TIMERMEMORY_INIT(...) 
   #define TIMERMEMORY_SCOPED(...) 
 #endif
@@ -134,10 +144,10 @@ struct class_name {                                                             
   INFO(## counter_name, STATICCOUNTER_GET(counter_name)) STATICCOUNTER_SET(counter_name, 0)
 
 #else
-  #define STATICCOUNTER(...)
-  #define STATICCOUNTER_ADD(counter_name, value)
+  #define STATICCOUNTER(...) (void)0
+  #define STATICCOUNTER_ADD(counter_name, value) (void)0
   #define STATICCOUNTER_GET(counter_name) size_t{0}
-  #define STATICCOUNTER_SET(counter_name, value)
+  #define STATICCOUNTER_SET(counter_name, value) (void)0
 #endif
 
 // TIMERSUM
@@ -151,9 +161,9 @@ struct class_name {                                                             
 #define TIMERSUM_SCOPED(...)                                                   \
   const auto& PM_INDENTION_NAME = PerfMonitor::internal::MakeFromFancyString<PerfMonitor::TimerSum>(PM_STRING_TO_LAMBDA("" ## __VA_ARGS__))
 
-#define TIMERSUM(...)                                                                                  \
-  if (const auto& indention_info = PerfMonitor::internal::MakeFromFancyString<PerfMonitor::TimerSum>(  \
-    PM_STRING_TO_LAMBDA("" ## __VA_ARGS__ )); false                                                    \
+#define TIMERSUM(...)                                                                                     \
+  if (const auto& PM_INDENTION_NAME = PerfMonitor::internal::MakeFromFancyString<PerfMonitor::TimerSum>(  \
+    PM_STRING_TO_LAMBDA("" ## __VA_ARGS__ )); false                                                       \
   ) {} else
 
 #define TIMERSUM_INIT(...)                                                     \
@@ -168,7 +178,6 @@ struct class_name {                                                             
 // Not thread-safe
 #define TIMERSUM_RESET(counter_name)                                            \
   INFO(## counter_name, TIMERSUM_GET(counter_name)) TIMERSUM_SET(counter_name, std::chrono::microseconds{0})
-
 #else
   #define TIMERSUM_SCOPED(...)                                                   
   #define TIMERSUM(...)                                                          
@@ -178,9 +187,20 @@ struct class_name {                                                             
 #endif
 
 // INFO
+#undef AT_EXIT
 #undef INFO
 #undef INFO_SCOPED
 #if OPTIONS_INFO
+#define AT_EXIT(...)                            \
+  if (const auto& PM_INDENTION_NAME = [&]() {   \
+    auto l = [&](){ __VA_ARGS__; };             \
+    struct Temporary                            \
+    {                                           \
+      decltype(l) ll;                           \
+      ~Temporary() { ll(); }                    \
+    };                                          \
+    return Temporary{l};                        \
+  }(); true )                                         
 #define INFO(...)                                                                                        \
   if (auto&& indendent_info = PerfMonitor::internal::MakeFromNothing<PerfMonitor::Indention::Indent>((   \
     [&](){                                                                                               \
@@ -194,8 +214,8 @@ struct class_name {                                                             
     using namespace PerfMonitor;                                                                             \
     PerfMonitor::PrintIfArgsEmpty(true, __FILE__, __LINE__, __VA_ARGS__);                                    \
     }(), nullptr));                                                                                          
-
 #else
+  #define AT_EXIT(...)
   #define INFO(...)                                                                                        
   #define INFO_SCOPED(...)                                                                                     
 #endif
@@ -211,7 +231,7 @@ struct class_name {                                                             
 * PASSERT(i > 0) std::cout << i; @endcode
 */
 #define PASSERT(...)                                                                                          \
-  if (const auto&& indention_info =                                                                           \
+  if (const auto&& PM_INDENTION_NAME =                                                                        \
     [&](){                                                                                                    \
       struct Result                                                                                           \
         {                                                                                                     \
@@ -240,6 +260,27 @@ struct class_name {                                                             
 * @code
 * PBREAK(i > 0) std::cout << i; @endcode
 */
-#define PBREAK(...) PASSERT(!(__VA_ARGS__))
+#define PBREAK(...) PASSERT(!(__VA_ARGS__))                       
+
+#define STATIC_INITIALIZATION(...)                                \
+  struct PM_CONCATENATE(pm_static_initialization, __COUNTER__) {  \
+    struct user_defined {                                         \
+      user_defined()                                              \
+        __VA_ARGS__                                               \
+    };                                                            \
+    user_defined t;                                               \
+  } PM_CONCATENATE(pm_static_initialization_obj, __COUNTER__)
+
+#define PRINT_GIT_BRANCH_HEADER()                                  \
+  STATIC_INITIALIZATION({    std::cout << "Branch: ";              \
+      system("git branch --show-current");                         \
+      INFO("Threads:", tbb::this_task_arena::max_concurrency());   \
+  })
+
+#define GLOBAL_VARIABLE(...)                                                   \
+  PerfMonitor::internal::MakeFromFancyString<PerfMonitor::GlobalVariableHandler>(PM_STRING_TO_LAMBDA("" ## __VA_ARGS__))
+
+
+#define OFF if constexpr (true) {} else
 
 // ReSharper restore IdentifierTypo
