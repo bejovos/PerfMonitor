@@ -14,9 +14,9 @@ template <typename, unsigned int>
 class Point;
 
 template <unsigned int>
-class Size;
+struct Size;
 template <unsigned int>
-class Index;
+struct Index;
 template <typename, unsigned int>
 class Vector;
 }

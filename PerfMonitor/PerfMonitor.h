@@ -232,7 +232,7 @@ struct class_name {                                                             
 */
 #define PASSERT(...)                                                                                          \
   if (const auto&& PM_INDENTION_NAME =                                                                        \
-    [&](){                                                                                                    \
+    [](bool value){                                                                                           \
       struct Result                                                                                           \
         {                                                                                                     \
           bool m_value;                                                                                       \
@@ -246,8 +246,8 @@ struct class_name {                                                             
           return m_value;                                                                                     \
           }                                                                                                   \
         };                                                                                                    \
-      return Result{__VA_ARGS__};                                                                             \
-    }()                                                                                                       \
+      return Result{value};                                                                                   \
+    }(__VA_ARGS__)                                                                                            \
   ) {} else
 
 #else

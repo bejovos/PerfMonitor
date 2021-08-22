@@ -8,6 +8,8 @@
 #include <iomanip>
 #include <chrono>
 #include <any>
+#include <io.h>
+#include <stdio.h>
 
 #include "_API.h"
 #include "IObject.h"
@@ -49,19 +51,19 @@ namespace PerfMonitor {
     stream << std::fixed;
     SetColor(Color::Yellow);
     if (time < 1000)
-      stream << std::setprecision(0) << round(time) << " us";
+      stream << std::setprecision(0) << round(time) << "us";
     else if (time < 1. * 1000 * 10)
-      stream << std::setprecision(2) << round(time / 1000 * 100) / 100 << " ms";
+      stream << std::setprecision(2) << round(time / 1000 * 100) / 100 << "ms";
     else if (time < 1. * 1000 * 100)
-      stream << std::setprecision(1) << round(time / 1000 * 10) / 10 << " ms";
+      stream << std::setprecision(1) << round(time / 1000 * 10) / 10 << "ms";
     else if (time < 1. * 1000 * 1000)
-      stream << std::setprecision(0) << round(time / 1000 * 1) / 1 << " ms";
+      stream << std::setprecision(0) << round(time / 1000 * 1) / 1 << "ms";
     else if (time < 1. * 1000 * 1000 * 10)
-      stream << std::setprecision(2) << round(time / 1000 / 1000 * 100) / 100 << " s";
+      stream << std::setprecision(2) << round(time / 1000 / 1000 * 100) / 100 << "s";
     else if (time < 1. * 1000 * 1000 * 100)
-      stream << std::setprecision(1) << round(time / 1000 / 1000 * 10) / 10 << " s";
+      stream << std::setprecision(1) << round(time / 1000 / 1000 * 10) / 10 << "s";
     else
-      stream << std::setprecision(0) << round(time / 1000 / 1000 * 1) / 1 << " s";
+      stream << std::setprecision(0) << round(time / 1000 / 1000 * 1) / 1 << "s";
     SetColor(Color::LightGray);
     stream.flags(flags);
     stream.precision(precision);
@@ -85,23 +87,23 @@ namespace PerfMonitor {
       }
     }
 
-    if (memory < 1000)
+    if (round(memory) < 1000)
       stream << std::setprecision(0) << round(memory) << " b";
-    else if (memory < 1. * 1024 * 10)
+    else if (round(memory / 1024 * 100) < 1000)
       stream << std::setprecision(2) << round(memory / 1024 * 100) / 100 << " kb";
-    else if (memory < 1. * 1024 * 100)
+    else if (round(memory / 1024 * 10) < 1000)
       stream << std::setprecision(1) << round(memory / 1024 * 10) / 10 << " kb";
-    else if (memory < 1. * 1024 * 1000)
+    else if (round(memory / 1024 * 1) < 1000)
       stream << std::setprecision(0) << round(memory / 1024 * 1) / 1 << " kb";
-    else if (memory < 1. * 1024 * 1024 * 10)
+    else if (round(memory / 1024 / 1024 * 100) < 1000)
       stream << std::setprecision(2) << round(memory / 1024 / 1024 * 100) / 100 << " mb";
-    else if (memory < 1. * 1024 * 1024 * 100)
+    else if (round(memory / 1024 / 1024 * 10) < 1000)
       stream << std::setprecision(1) << round(memory / 1024 / 1024 * 10) / 10 << " mb";
-    else if (memory < 1. * 1024 * 1024 * 1000)
+    else if (round(memory / 1024 / 1024 * 1) < 1000)
       stream << std::setprecision(0) << round(memory / 1024 / 1024 * 1) / 1 << " mb";
-    else if (memory < 1. * 1024 * 1024 * 1024 * 10)
+    else if (round(memory / 1024 / 1024 / 1024 * 100) < 1000)
       stream << std::setprecision(2) << round(memory / 1024 / 1024 / 1024 * 100) / 100 << " gb";
-    else if (memory < 1. * 1024 * 1024 * 1024 * 100)
+    else if (round(memory / 1024 / 1024 / 1024 * 10) < 1000)
       stream << std::setprecision(1) << round(memory / 1024 / 1024 / 1024 * 10) / 10 << " gb";
     else
       stream << std::setprecision(0) << round(memory / 1024 / 1024 / 1024 * 1) / 1 << " gb";
@@ -252,16 +254,32 @@ namespace PerfMonitor {
       return variable;
     }
 
+    bool has_value()
+    {
+      if (data == nullptr)
+        data = Init();
+      return data->has_value();
+    }
+
     template <class T>
     auto read()
     {
-      std::cout << Purple << "#" << params::strings[1] << LightGray << " = "; 
+      std::cout << Purple << "#" << params::strings[1] << LightGray << " = ";
       T t;
-      std::cin >> t;
+      std::cin >> std::boolalpha >> t;
+      if (IsCinRedirected())
+        std::cout << std::boolalpha << t << std::endl;
+
       if (data == nullptr)
         data = Init();
       *data = t;
     }
+
+  private:
+    static bool IsCinRedirected()
+      {
+        return !_isatty(_fileno(stdin));
+      }
 
     static std::any* data;
   };
