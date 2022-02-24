@@ -50,17 +50,17 @@ namespace PerfMonitor {
     auto flags = stream.flags();
     stream << std::fixed;
     SetColor(Color::Yellow);
-    if (time < 1000)
+    if (round(time) < 1000)
       stream << std::setprecision(0) << round(time) << "us";
-    else if (time < 1. * 1000 * 10)
+    else if (round(time / 1000 * 100) < 1000)
       stream << std::setprecision(2) << round(time / 1000 * 100) / 100 << "ms";
-    else if (time < 1. * 1000 * 100)
+    else if (round(time / 1000 * 10) < 1000)
       stream << std::setprecision(1) << round(time / 1000 * 10) / 10 << "ms";
-    else if (time < 1. * 1000 * 1000)
+    else if (round(time / 1000 * 1) < 1000)
       stream << std::setprecision(0) << round(time / 1000 * 1) / 1 << "ms";
-    else if (time < 1. * 1000 * 1000 * 10)
+    else if (round(time / 1000 / 1000 * 100) < 1000)
       stream << std::setprecision(2) << round(time / 1000 / 1000 * 100) / 100 << "s";
-    else if (time < 1. * 1000 * 1000 * 100)
+    else if (round(time / 1000 / 1000 * 10) < 1000)
       stream << std::setprecision(1) << round(time / 1000 / 1000 * 10) / 10 << "s";
     else
       stream << std::setprecision(0) << round(time / 1000 / 1000 * 1) / 1 << "s";
@@ -88,25 +88,25 @@ namespace PerfMonitor {
     }
 
     if (round(memory) < 1000)
-      stream << std::setprecision(0) << round(memory) << " b";
+      stream << std::setprecision(0) << round(memory) << "b";
     else if (round(memory / 1024 * 100) < 1000)
-      stream << std::setprecision(2) << round(memory / 1024 * 100) / 100 << " kb";
+      stream << std::setprecision(2) << round(memory / 1024 * 100) / 100 << "kb";
     else if (round(memory / 1024 * 10) < 1000)
-      stream << std::setprecision(1) << round(memory / 1024 * 10) / 10 << " kb";
+      stream << std::setprecision(1) << round(memory / 1024 * 10) / 10 << "kb";
     else if (round(memory / 1024 * 1) < 1000)
-      stream << std::setprecision(0) << round(memory / 1024 * 1) / 1 << " kb";
+      stream << std::setprecision(0) << round(memory / 1024 * 1) / 1 << "kb";
     else if (round(memory / 1024 / 1024 * 100) < 1000)
-      stream << std::setprecision(2) << round(memory / 1024 / 1024 * 100) / 100 << " mb";
+      stream << std::setprecision(2) << round(memory / 1024 / 1024 * 100) / 100 << "mb";
     else if (round(memory / 1024 / 1024 * 10) < 1000)
-      stream << std::setprecision(1) << round(memory / 1024 / 1024 * 10) / 10 << " mb";
+      stream << std::setprecision(1) << round(memory / 1024 / 1024 * 10) / 10 << "mb";
     else if (round(memory / 1024 / 1024 * 1) < 1000)
-      stream << std::setprecision(0) << round(memory / 1024 / 1024 * 1) / 1 << " mb";
+      stream << std::setprecision(0) << round(memory / 1024 / 1024 * 1) / 1 << "mb";
     else if (round(memory / 1024 / 1024 / 1024 * 100) < 1000)
-      stream << std::setprecision(2) << round(memory / 1024 / 1024 / 1024 * 100) / 100 << " gb";
+      stream << std::setprecision(2) << round(memory / 1024 / 1024 / 1024 * 100) / 100 << "gb";
     else if (round(memory / 1024 / 1024 / 1024 * 10) < 1000)
-      stream << std::setprecision(1) << round(memory / 1024 / 1024 / 1024 * 10) / 10 << " gb";
+      stream << std::setprecision(1) << round(memory / 1024 / 1024 / 1024 * 10) / 10 << "gb";
     else
-      stream << std::setprecision(0) << round(memory / 1024 / 1024 / 1024 * 1) / 1 << " gb";
+      stream << std::setprecision(0) << round(memory / 1024 / 1024 / 1024 * 1) / 1 << "gb";
     SetColor(Color::LightGray);
     stream.flags(flags);
     stream.precision(precision);
@@ -143,9 +143,9 @@ namespace PerfMonitor {
     PERFMONITOR_API void*& RegisterGlobalVariable(const char* const* ip_counter);
 
     // not thread safe
-    // PERFMONITOR_API size_t GetTotalValue(const char* ip_name);
+    PERFMONITOR_API size_t GetTotalValue(const char* const* ip_counter);
     // not thread safe
-    // PERFMONITOR_API void SetTotalValue(const char* ip_name, size_t i_value);
+    PERFMONITOR_API void SetTotalValue(const char* const* ip_counter, size_t i_value);
     // not thread safe
     PERFMONITOR_API void ResetCounters(const char* ip_regexp, const char* ip_regexp_to_print = ".*");
   }
@@ -188,6 +188,15 @@ namespace PerfMonitor {
       size_t data{ 0 };
     };
 
+    static void SetTotal(size_t microseconds)
+    {
+      CounterUtils::SetTotalValue(CounterParams::strings, microseconds);
+    }
+    static size_t GetTotal()
+    {
+      return CounterUtils::GetTotalValue(CounterParams::strings);
+    }
+
     static thread_local Storage storage;
   };
 
@@ -195,18 +204,29 @@ namespace PerfMonitor {
   thread_local typename Counter<CounterParams>::Storage Counter<CounterParams>::storage;
 
   template <class... Strings>
-  struct TimerSum
+  struct TimerSumAccessor
     : internal::non_copyable
     , internal::non_moveable
     , internal::convertable_to_bool_false
     , Counter<CounterParams<String<'T'>, Strings...>>
   {
+    static auto GetTotal()
+    {
+      double res = Counter<CounterParams<String<'T'>, Strings...>> ::GetTotal() * GetInvFrequency();
+      return std::chrono::microseconds{ static_cast<size_t>(res) };
+    }
+  };
+
+  template <class... Strings>
+  struct TimerSum : TimerSumAccessor<Strings...>
+  {
     ~TimerSum()
     {
-      Counter<CounterParams<String<'T'>, Strings...>>::storage.Increment(FinalizeTimeCounter(m_value));
+      Counter<CounterParams<String<'T'>, Strings...>>::storage.Increment(
+        GetRealTime() - m_value);;
     }
 
-    const std::int64_t m_value = InitTimeCounter();
+    const std::int64_t m_value = GetRealTime();
   };
 
   template <class... Strings>
@@ -245,12 +265,13 @@ namespace PerfMonitor {
     }
 
     template <class T>
-    T set(T variable)
+    T set(T variable, bool silent = false)
     {
       if (data == nullptr)
         data = Init();
       *data = variable;
-      std::cout << Purple << "#" << params::strings[1] << LightGray << " = " << variable << "\n"; 
+      if (silent == false)
+        std::cout << Purple << "#" << params::strings[1] << LightGray << " = " << variable << "\n"; 
       return variable;
     }
 

@@ -71,24 +71,48 @@ namespace PerfMonitor {
     }
   }
 
-  // size_t CounterUtils::GetTotalValue(const char* ip_name)
-  //   {
-  //   std::lock_guard<std::recursive_mutex> lock(p_counter_storage->mutex);
-  //   std::int64_t result = 0;
-  //   const size_t id = p_counter_storage->name_w_ids[ip_name]; 
-  //   for (const size_t* ar : p_counter_storage->counters[id].clients)
-  //     result += *ar;
-  //   return result;
-  //   }
+  size_t CounterUtils::GetTotalValue(const char* const* ip_counter)
+    {
+    std::lock_guard lock(p_total_storage->mutex);
+    const char* type = ip_counter[0];
+    const char* message = ip_counter[1];
+    const char* file = ip_counter[2];
+    const char* function = ip_counter[3];
+    const char* line = ip_counter[4];
 
-  // void CounterUtils::SetTotalValue(const char* ip_name, const size_t i_value)
-  //   {
-  //   std::lock_guard<std::recursive_mutex> lock(p_counter_storage->mutex);
-  //   const size_t id = p_counter_storage->name_w_ids[ip_name]; 
-  //   for (size_t* ar : p_counter_storage->counters[id].clients)
-  //     *ar = 0;
-  //   *p_counter_storage->counters[id].clients.front() = i_value;
-  //   }
+    std::string counter_unique_name;
+    if (strlen(message) != 0)
+      counter_unique_name = std::string(type) + std::string(message);
+    else
+      counter_unique_name = std::string(type) + std::string(file) + std::string(line);
+
+    size_t result = 0;
+    const auto id = p_total_storage->name_w_ids[counter_unique_name];
+    for (const size_t* client : p_total_storage->counters[id].clients)
+      result += *client;
+    return result;
+    }
+
+  void CounterUtils::SetTotalValue(const char* const* ip_counter, const size_t i_value)
+    {
+    std::lock_guard lock(p_total_storage->mutex);
+    const char* type = ip_counter[0];
+    const char* message = ip_counter[1];
+    const char* file = ip_counter[2];
+    const char* function = ip_counter[3];
+    const char* line = ip_counter[4];
+
+    std::string counter_unique_name;
+    if (strlen(message) != 0)
+      counter_unique_name = std::string(type) + std::string(message);
+    else
+      counter_unique_name = std::string(type) + std::string(file) + std::string(line);
+
+    const auto id = p_total_storage->name_w_ids[counter_unique_name];
+    for (size_t* client : p_total_storage->counters[id].clients)
+      *client = 0;
+    *p_total_storage->counters[id].clients.front() = i_value;
+    }
 
   std::vector<std::reference_wrapper<CounterStorage>> GetAllCountersForPrinting()
   {

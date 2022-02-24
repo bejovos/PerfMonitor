@@ -105,7 +105,7 @@ namespace PerfMonitor
     {
     auto precision = stream.precision();
     auto flags = stream.flags();
-    stream << std::fixed << std::setprecision(2);
+    stream << std::fixed;
     for (size_t i=0; i<Type::dimension - 1; ++i)
       stream << point[i] << " ";
     stream << point[Type::dimension - 1];

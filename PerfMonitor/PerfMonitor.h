@@ -53,6 +53,14 @@ struct class_name {                                                             
 #undef TIMERMEMORY_SCOPED
 #if OPTIONS_TIMERMEMORY
 
+#define TIMER_SCOPED_KERNEL(...) \
+  const auto&& PM_INDENTION_NAME = PerfMonitor::internal::MakeFromNothing<PerfMonitor::KernelTimeWatcher>((                   \
+    [&]() {                                                                                                                   \
+    using namespace PerfMonitor;                                                                                              \
+    PerfMonitor::PrintIfArgsEmpty(false, __FILE__, __LINE__, __VA_ARGS__);                                                    \
+    }(), nullptr))
+
+
 /**
 * @brief Timer. Prints elapsed time to cout in its destructor. Nested scope is indented.
 * Usage examples:
@@ -144,8 +152,8 @@ struct class_name {                                                             
   INFO(## counter_name, STATICCOUNTER_GET(counter_name)) STATICCOUNTER_SET(counter_name, 0)
 
 #else
-  #define STATICCOUNTER(...) (void)0
-  #define STATICCOUNTER_ADD(counter_name, value) (void)0
+  #define STATICCOUNTER(...) if (false) {} else
+  #define STATICCOUNTER_ADD(counter_name, value) if (false) {} else
   #define STATICCOUNTER_GET(counter_name) size_t{0}
   #define STATICCOUNTER_SET(counter_name, value) (void)0
 #endif
@@ -171,10 +179,10 @@ struct class_name {                                                             
 
 // Not thread-safe
 #define TIMERSUM_GET(counter_name)                                              \
-  PerfMonitor::internal::MakeFromFancyString<PerfMonitor::TimerSum>(PM_STRING_TO_LAMBDA(counter_name)).GetTotal() 
+  PerfMonitor::internal::MakeFromFancyString<PerfMonitor::TimerSumAccessor>(PM_STRING_TO_LAMBDA(counter_name)).GetTotal() 
 // Not thread-safe
 #define TIMERSUM_SET(counter_name, microseconds)                                \
-  PerfMonitor::internal::MakeFromFancyString<PerfMonitor::TimerSum>(PM_STRING_TO_LAMBDA(counter_name)).SetTotal(microseconds) 
+  PerfMonitor::internal::MakeFromFancyString<PerfMonitor::TimerSumAccessor>(PM_STRING_TO_LAMBDA(counter_name)).SetTotal(microseconds) 
 // Not thread-safe
 #define TIMERSUM_RESET(counter_name)                                            \
   INFO(## counter_name, TIMERSUM_GET(counter_name)) TIMERSUM_SET(counter_name, std::chrono::microseconds{0})
